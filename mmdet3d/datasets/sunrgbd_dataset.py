@@ -190,6 +190,7 @@ class SUNRGBDDataset(Custom3DDataset):
             pipeline (list[dict], optional): raw data loading for showing.
                 Default: None.
         """
+        import pdb; pdb.set_trace()
         assert out_dir is not None, 'Expect out_dir, got none.'
         pipeline = self._get_pipeline(pipeline)
         for i, result in enumerate(results):
@@ -197,10 +198,10 @@ class SUNRGBDDataset(Custom3DDataset):
             pts_path = data_info['pts_path']
             file_name = osp.split(pts_path)[-1].split('.')[0]
             points, img_metas, img = self._extract_data(
-                i, pipeline, ['points', 'img_metas', 'img'])
+                i, pipeline, ['points', 'img_metas', 'img']) # img is None
             # scale colors to [0, 255]
-            points = points.numpy()
-            points[:, 3:] *= 255
+            points = points.numpy() # 50000 x 6
+            points[:, 3:] *= 255 # last three columns are multiplied by 255
 
             gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
             gt_corners = gt_bboxes.corners.numpy() if len(gt_bboxes) else None

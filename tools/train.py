@@ -173,8 +173,10 @@ def main():
         _, world_size = get_dist_info()
         cfg.gpu_ids = range(world_size)
 
+    # import pdb; pdb.set_trace()
     # create work_dir
     mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
+    
     # dump config
     cfg.dump(osp.join(cfg.work_dir, osp.basename(args.config)))
     # init the logger before other steps

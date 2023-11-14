@@ -117,33 +117,35 @@ def show_result(points,
     result_path = osp.join(out_dir, filename)
     mmcv.mkdir_or_exist(result_path)
 
-    if show:
-        from .open3d_vis import Visualizer
+    #NOTE: The show option has been switched off in order to save
+    # if show:
+    
+    #     from .open3d_vis import Visualizer
 
-        vis = Visualizer(points)
-        if pred_bboxes is not None:
-            if pred_labels is None:
-                vis.add_bboxes(bbox3d=pred_bboxes)
-            else:
-                palette = np.random.randint(
-                    0, 255, size=(pred_labels.max() + 1, 3)) / 256
-                labelDict = {}
-                for j in range(len(pred_labels)):
-                    i = int(pred_labels[j].numpy())
-                    if labelDict.get(i) is None:
-                        labelDict[i] = []
-                    labelDict[i].append(pred_bboxes[j])
-                for i in labelDict:
-                    vis.add_bboxes(
-                        bbox3d=np.array(labelDict[i]),
-                        bbox_color=palette[i],
-                        points_in_box_color=palette[i])
-
-        if gt_bboxes is not None:
-            vis.add_bboxes(bbox3d=gt_bboxes, bbox_color=(0, 0, 1))
-        show_path = osp.join(result_path,
-                             f'{filename}_online.png') if snapshot else None
-        vis.show(show_path)
+    #     vis = Visualizer(points)
+    #     if pred_bboxes is not None:
+    #         if pred_labels is None:
+    #             vis.add_bboxes(bbox3d=pred_bboxes)
+    #         else:
+    #             palette = np.random.randint(
+    #                 0, 255, size=(pred_labels.max() + 1, 3)) / 256
+    #             labelDict = {}
+    #             for j in range(len(pred_labels)):
+    #                 i = int(pred_labels[j].numpy())
+    #                 if labelDict.get(i) is None:
+    #                     labelDict[i] = []
+    #                 labelDict[i].append(pred_bboxes[j])
+    #             for i in labelDict:
+    #                 vis.add_bboxes(
+    #                     bbox3d=np.array(labelDict[i]),
+    #                     bbox_color=palette[i],
+    #                     points_in_box_color=palette[i])
+        
+    #     if gt_bboxes is not None:
+    #         vis.add_bboxes(bbox3d=gt_bboxes, bbox_color=(0, 0, 1))
+    #     show_path = osp.join(result_path,
+    #                          f'{filename}_online.png') if snapshot else None
+    #     vis.show(show_path)
 
     if points is not None:
         _write_obj(points, osp.join(result_path, f'{filename}_points.obj'))
