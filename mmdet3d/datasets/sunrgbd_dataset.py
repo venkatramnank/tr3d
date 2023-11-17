@@ -43,6 +43,7 @@ class SUNRGBDDataset(Custom3DDataset):
         test_mode (bool, optional): Whether the dataset is in test mode.
             Defaults to False.
     """
+    
     CLASSES = ('bed', 'table', 'sofa', 'chair', 'toilet', 'desk', 'dresser',
                'night_stand', 'bookshelf', 'bathtub')
 
@@ -56,6 +57,7 @@ class SUNRGBDDataset(Custom3DDataset):
                  filter_empty_gt=True,
                  test_mode=False,
                  **kwargs):
+        
         super().__init__(
             data_root=data_root,
             ann_file=ann_file,
@@ -88,6 +90,7 @@ class SUNRGBDDataset(Custom3DDataset):
                 - calib (dict, optional): Camera calibration info.
                 - ann_info (dict): Annotation info.
         """
+ 
         info = self.data_infos[index]
         sample_idx = info['point_cloud']['lidar_idx']
         assert info['point_cloud']['lidar_idx'] == info['image']['image_idx']
@@ -190,7 +193,7 @@ class SUNRGBDDataset(Custom3DDataset):
             pipeline (list[dict], optional): raw data loading for showing.
                 Default: None.
         """
-        import pdb; pdb.set_trace()
+
         assert out_dir is not None, 'Expect out_dir, got none.'
         pipeline = self._get_pipeline(pipeline)
         for i, result in enumerate(results):
