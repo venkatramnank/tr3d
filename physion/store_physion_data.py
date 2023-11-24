@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import math
 from mpl_toolkits.mplot3d import Axes3D
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
+from physion.physion_tools import PhysionPointCloudGenerator
 
 SPLIT = "train"
 PHYSION_HDF5_ROOT = "/home/kashis/Desktop/Eval7/tr3d/data/physion/Dominoes_testing_HDF5s/Dominoes/" + f"{SPLIT}"
@@ -157,8 +158,10 @@ def get_phys_dict(img_idx, filename, frame_id):
 
     # TODO: Verify depth to point cloud
     depth_img = f_obj[frame_id]["images"]["_depth"][:]
-    depth_trans_img = get_depth_values(depth_img, width=img_width, height=img_height)
-    pcd = depth2pointcloud_np(depth_trans_img.reshape((1, 1, img_width, img_height)), pix_T_cam)[0]
+    # depth_trans_img = get_depth_values(depth_img, width=img_width, height=img_height)
+    pcd_generator = PhysionPointCloudGenerator(hdf5_file_path=filename, frame_number=frame_id, plot=False)
+    pcd = pcd_generator.run()
+    # pcd = depth2pointcloud_np(depth_trans_img.reshape((1, 1, img_width, img_height)), pix_T_cam)[0]
 
     # Visualize point cloud
     vis = Visualizer(pcd)
