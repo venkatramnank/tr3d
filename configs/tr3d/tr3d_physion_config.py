@@ -44,9 +44,8 @@ resume_from = None
 workflow = [('train', 1)]
 
 dataset_type = 'SUNRGBDDataset'
-data_root = 'data/sunrgbd/'
-class_names = ('bed', 'table', 'sofa', 'chair', 'toilet', 'desk', 'dresser',
-               'night_stand', 'bookshelf', 'bathtub')
+data_root = 'data/physion/'
+class_names = ['object']
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',
@@ -96,16 +95,16 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=16,
+    samples_per_gpu=1,
     workers_per_gpu=1,
     train=dict(
         type='RepeatDataset',
-        times=5,
+        times=1,
         dataset=dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
-            ann_file=data_root + 'sunrgbd_infos_train.pkl',
+            ann_file=data_root + 'train.pkl',
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
@@ -114,7 +113,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'sunrgbd_infos_val.pkl',
+        ann_file=data_root + 'val.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
@@ -123,7 +122,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'sunrgbd_infos_val.pkl',
+        ann_file=data_root + 'val.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
