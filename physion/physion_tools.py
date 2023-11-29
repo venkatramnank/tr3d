@@ -315,6 +315,7 @@ class PhysionPointCloudGenerator:
             [obj_depth_point_world_f, background_depth_point_world], axis=0)
         complete_pcd_colors = np.concatenate(
             [obj_partial_rgb_f, background_rgb_value], axis=0)
+        complete_pcd_colors = complete_pcd_colors/255.
         complete_pcd = np.concatenate(
             [complete_pcd_world, complete_pcd_colors], axis=1)
 
