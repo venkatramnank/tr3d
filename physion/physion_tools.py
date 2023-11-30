@@ -56,7 +56,7 @@ class PhysionPointCloudGenerator:
             numpy.ndarray: H x W x 3 image
         """
         image = Image.open(io.BytesIO(tmp))
-        image = ImageOps.mirror(image)
+        # image = ImageOps.mirror(image)
 
         image_array = np.array(image)
         return image_array
@@ -74,7 +74,8 @@ class PhysionPointCloudGenerator:
         :param far_plane: The far clipping plane. See command `set_camera_clipping_planes`. The default value in this function is the default value of the far clipping plane.
         :return An array of depth values.
         """
-        image = np.flip(np.reshape(image, (height, width, 3)), 1)
+        # image = np.flip(np.reshape(image, (height, width, 3)), 1)
+        image = np.reshape(image, (height, width, 3))
 
         # Convert the image to a 2D image array.
         if depth_pass == "_depth":
@@ -323,3 +324,50 @@ class PhysionPointCloudGenerator:
             self.pcd_visualizer_with_color(complete_pcd_world, complete_pcd_colors)
         
         return complete_pcd
+
+
+def bbox_3d_visualizer(points, bbox_params, bbox_color=(0, 1, 0), rot_axis=2, center_mode=None):
+    """
+    Draw bbox on visualizer and change the color of points inside bbox3d.
+
+    Args:
+        pcd (:obj:`open3d.geometry.PointCloud`): point cloud of shape (points x 6) representing xyzrgb.
+        bbox_params (list): 3d bbox (x, y, z, x_size, y_size, z_size, yaw) to visualize.
+        bbox_color (tuple[float], optional): the color of bbox.
+            Default: (0, 1, 0).
+        rot_axis (int, optional): rotation axis of bbox. Default: 2.
+        center_mode (bool, optional): indicate the center of bbox is
+            bottom center or gravity center. available mode
+            ['lidar_bottom', 'camera_bottom']. Default: None.
+    """
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points[:, :3])
+    pcd.colors = o3d.utility.Vector3dVector(points[:, 3:])
+    vis.add_geometry(pcd)
+    for i in range(len(bbox_params)):
+        center = bbox_params[i, 0:3]
+        dim = bbox_params[i, 3:6]
+        yaw = np.zeros(3)
+        yaw[rot_axis] = bbox_params[i, 6]
+        rot_mat = o3d.geometry.get_rotation_matrix_from_xyz(yaw)
+
+        if center_mode == 'lidar_bottom':
+            center[rot_axis] += dim[rot_axis] / 2  # bottom center to gravity center
+        elif center_mode == 'camera_bottom':
+            center[rot_axis] -= dim[rot_axis] / 2  # bottom center to gravity center
+
+        box3d = o3d.geometry.OrientedBoundingBox(center, rot_mat, dim)
+
+        line_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(box3d)
+        line_set.paint_uniform_color(bbox_color)
+        # draw bboxes on visualizer
+        vis.add_geometry(line_set)
+
+
+    # update points colors
+    vis.update_geometry(pcd)
+    vis.run()
+    # Close the visualizer window
+    vis.destroy_window()
