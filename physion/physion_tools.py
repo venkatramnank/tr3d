@@ -18,7 +18,10 @@ class PhysionPointCloudGenerator:
 
     def __init__(self, hdf5_file_path, frame_number, plot=False):
         self.hdf5_file_path = hdf5_file_path
-        self.frame_number = '{:04d}'.format(frame_number)
+        if not isinstance(frame_number, str):
+            self.frame_number = '{:04d}'.format(frame_number)
+        else:
+            self.frame_number = frame_number
         self.hf = h5py.File(self.hdf5_file_path, 'r')
 
         self.object_ids = self.hf["static"]["object_ids"][:].tolist()
@@ -33,10 +36,12 @@ class PhysionPointCloudGenerator:
 
         self.img_array = self.io2image(
             self.hf["frames"][self.frame_number]["images"]["_img"][:])
+        self.img_height = self.img_array.shape[0]
+        self.img_width = self.img_array.shape[1]
         self.seg_array = self.io2image(
             self.hf["frames"][self.frame_number]["images"]["_id"][:])
         self.dep_array = self.get_depth_values(
-            self.hf["frames"][self.frame_number]["images"]["_depth"][:], near_plane=0.1, far_plane=100)
+            self.hf["frames"][self.frame_number]["images"]["_depth"][:], width=self.img_width, height=self.img_height, near_plane=0.1, far_plane=100)
         self.positions = self.hf["frames"][self.frame_number]["objects"]["positions"][:]
         self.rotations = self.hf["frames"][self.frame_number]["objects"]["rotations"][:]
         self.plot = plot
@@ -94,7 +99,6 @@ class PhysionPointCloudGenerator:
         """
         H, W = size
         vfov = 2.0 * math.atan(1.0/proj_matrix[1][1]) * 180.0 / np.pi
-        print('vfov', vfov)
         vfov = vfov / 180.0 * np.pi
         tan_half_vfov = np.tan(vfov / 2.0)
         tan_half_hfov = tan_half_vfov * H / float(H)
@@ -192,7 +196,6 @@ class PhysionPointCloudGenerator:
         obj_3D = np.linalg.inv(projection_matrix) @ obj_3D.T
 
         obj_3D = (np.linalg.inv(camera_matrix) @ obj_3D).T
-        print(obj_3D)
         return obj_3D[:, :3]
 
     def background_pc(self, size, ind_i_all, ind_j_all, true_z_f, rgb_f, camera_matrix, projection_matrix):
@@ -263,11 +266,11 @@ class PhysionPointCloudGenerator:
         ind_i_all, ind_j_all = [], []
 
         for idx, obj_id in enumerate(self.object_ids):
-            obj_name = self.hf['static']['model_names'][:][idx]
-            if obj_name in self.hf['static']['distractors'][:]:
-                continue
-            if obj_name in self.hf['static']['occluders'][:]:
-                continue
+            # obj_name = self.hf['static']['model_names'][:][idx]
+            # if obj_name in self.hf['static']['distractors'][:]:
+            #     continue
+            # if obj_name in self.hf['static']['occluders'][:]:
+            #     continue
 
             selected_mask = np.logical_and.reduce(
                 (
