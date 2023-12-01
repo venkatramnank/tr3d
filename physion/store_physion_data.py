@@ -61,14 +61,14 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
 
     pcd_info = {
         'num_features': 6,
-        'lidar_idx': 1
+        'lidar_idx': img_idx
     }
 
     pts_path = 'points/{}/'.format(SPLIT) + file_frame_combined_name + '.bin'
 
     # TODO: Verify image_idx
     image_obj = {
-        'image_idx': 1,
+        'image_idx': img_idx,
         'image_shape': [img_height, img_width],
         'image_path': 'image/{}/'.format(SPLIT) + file_frame_combined_name + '.jpg'
     }
@@ -79,8 +79,8 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     # TODO: Verify
     pix_T_cam, _, _ = get_intrinsics_from_projection_matrix(np_proj_mat, (img_height, img_width))
     calib = {
-        'K': pix_T_cam,
-        'Rt': np_cam
+        'K': pix_T_cam.astype(np.float32),
+        'Rt': np_cam.astype(np.float32)
     }
 
     pcd_generator = PhysionPointCloudGenerator(hdf5_file_path=os.path.join(PHYSION_HDF5_ROOT, _file, filename), frame_number=frame_id, plot=False)
@@ -171,7 +171,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         # TODO Verify rotation_y is one angle per object? [1 x num_objs]?
         'rotation_y': np.asarray(heading_ang),
         'index': np.asarray([i for i in range(num_segments_in_img)]),
-        'class': np.asarray([0 for _ in range(num_segments_in_img)]),
+        'class': np.asarray([0 for _ in range(num_segments_in_img)], dtype=np.int32),
         'gt_boxes_upright_depth': np.asarray(gt_boxes_upright_depth_list)
     }
 
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     data_infos = []
     img_idx = 0
     start = 50
-    frames_per_vid = 50
+    frames_per_vid = 20
     for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
         for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
             if os.path.join(PHYSION_HDF5_ROOT, _file, filename).endswith('hdf5'):
@@ -213,6 +213,7 @@ if __name__ == "__main__":
                         for frame_id in list(file["frames"].keys())[start : start + frames_per_vid]:
                             phys_dict = get_phys_dict(img_idx, _file, _file_idx, filename, frame_id)
                             print(filename, frame_id)
+                            print("img_idx: ",img_idx)
                             img_idx += 1
                             data_infos.append(phys_dict)
                 except OSError:

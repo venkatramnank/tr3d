@@ -185,7 +185,7 @@ def train_detector(model,
                    timestamp=None,
                    meta=None):
     logger = get_mmdet_root_logger(log_level=cfg.log_level)
-
+    # import pdb;pdb.set_trace()
     # prepare data loaders
     dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]
     if 'imgs_per_gpu' in cfg.data:
