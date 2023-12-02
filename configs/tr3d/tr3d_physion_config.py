@@ -45,7 +45,7 @@ resume_from = None
 workflow = [('train', 1)]
 
 dataset_type = 'SUNRGBDDataset'
-data_root = '/home/kalyanav/MS_thesis/tr3d_data/physion/'
+data_root = 'data/physion/'
 class_names = ['object']
 train_pipeline = [
     dict(
