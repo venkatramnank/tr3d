@@ -12,15 +12,15 @@ import math
 from mpl_toolkits.mplot3d import Axes3D
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
 from physion_tools import PhysionPointCloudGenerator
-import argparse
 
-global_object_types = set()
+SPLIT = "val"
+PHYSION_HDF5_ROOT = "/home/kashis/Desktop/Eval7/tr3d/data/physion/HDF5/" + f"{SPLIT}"
+PREV_PKL_FILE_PATH = "/home/kashis/Desktop/Eval7/tr3d/data/physion" + f"/{SPLIT}.pkl"
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--split', type=str, help="Train or validation split")
-    args = parser.parse_args()
-    return args
+PHYSION_RGB_PATH = "/home/kashis/Desktop/Eval7/tr3d/physion"
+
+STORE_PATH_ROOT = "/home/kashis/Desktop/Eval7/tr3d/data/physion/"
+
 
 def get_intrinsics_from_projection_matrix(proj_matrix, size=(256, 256)):
     H, W = size
@@ -44,15 +44,16 @@ def get_bbox_from_seg_mask(seg_mask):
     top_left = (np.min(a[1]), np.min(a[0]))
     return [top_left[0], top_left[1], width, height]
 
-def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
+def get_phys_dict(img_idx, filename, frame_id):
 
-    file_frame_combined_name = filename.split(".hdf5")[0] + "_" + str(_file_idx) + "_" + frame_id
+    file_frame_combined_name = filename.split(".hdf5")[0] + "_" + frame_id
+
     s_obj = file["static"]
     f_obj = file["frames"]
     rgb = f_obj[frame_id]["images"]["_img"][:]
     image = Image.open(io.BytesIO(rgb))
     # image = ImageOps.mirror(image)
-    RGB_IMG_PATH = os.path.join(STORE_PATH_ROOT, "phys_trainval", "image", SPLIT) + "/" + file_frame_combined_name + ".jpg"
+    RGB_IMG_PATH = os.path.join(STORE_PATH_ROOT, "phys_trainval", "image") + "/" + file_frame_combined_name + ".jpg"
     image.save(RGB_IMG_PATH)
 
     img_width = image.size[0]
@@ -64,13 +65,13 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         'lidar_idx': img_idx
     }
 
-    pts_path = 'points/{}/'.format(SPLIT) + file_frame_combined_name + '.bin'
+    pts_path = 'points/' + file_frame_combined_name + '.bin'
 
     # TODO: Verify image_idx
     image_obj = {
         'image_idx': img_idx,
         'image_shape': [img_height, img_width],
-        'image_path': 'image/{}/'.format(SPLIT) + file_frame_combined_name + '.jpg'
+        'image_path': 'image/' + file_frame_combined_name + '.jpg'
     }
 
     np_cam = np.reshape(np.asarray(f_obj[frame_id]['camera_matrices']['camera_matrix'][:]), (4,4))
@@ -79,11 +80,11 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     # TODO: Verify
     pix_T_cam, _, _ = get_intrinsics_from_projection_matrix(np_proj_mat, (img_height, img_width))
     calib = {
-        'K': pix_T_cam.astype(np.float32),
-        'Rt': np_cam.astype(np.float32)
+        'K': pix_T_cam,
+        'Rt': np_cam
     }
 
-    pcd_generator = PhysionPointCloudGenerator(hdf5_file_path=os.path.join(PHYSION_HDF5_ROOT, _file, filename), frame_number=frame_id, plot=False)
+    pcd_generator = PhysionPointCloudGenerator(hdf5_file_path=os.path.join(PHYSION_HDF5_ROOT, filename), frame_number=frame_id, plot=False)
     pcd = pcd_generator.run()
 
     pcd.astype('float32').tofile(os.path.join(STORE_PATH_ROOT, pts_path))
@@ -93,7 +94,6 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     dimensions_list = []
     gt_boxes_upright_depth_list = []
     heading_ang = []
-    names_list = []
 
     for seg_id in range(num_segments_in_img):
         # obj_name = s_obj['model_names'][:][seg_id]
@@ -104,12 +104,9 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
 
 
         seg_color = s_obj["object_segmentation_colors"][seg_id]
-        object_name = s_obj['model_names'][seg_id].decode('utf-8')
-        # Adding to the set in order to see different types of objects
-        global_object_types.add(object_name)
         seg = f_obj[frame_id]["images"]["_id"][:]
         image = Image.open(io.BytesIO(seg))
-        image = ImageOps.mirror(image)
+        # image = ImageOps.mirror(image)
         seg_numpy_arr = np.array(image)
         seg_mask = (seg_numpy_arr == seg_color).all(-1)
         seg_mask = seg_mask.astype(np.uint8)
@@ -152,7 +149,6 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         #TODO Check (x, y, z, x_size, y_size, z_size, yaw) x_size, y_size, z_size ordering
         gt_boxes_upright_depth = [center_x, center_y, center_z, length_val, height_val, width_val, yaw]
         gt_boxes_upright_depth_list.append(gt_boxes_upright_depth)
-        names_list.append(object_name)
 
     
         
@@ -171,7 +167,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         # TODO Verify rotation_y is one angle per object? [1 x num_objs]?
         'rotation_y': np.asarray(heading_ang),
         'index': np.asarray([i for i in range(num_segments_in_img)]),
-        'class': np.asarray([0 for _ in range(num_segments_in_img)], dtype=np.int32),
+        'class': np.asarray([0 for _ in range(num_segments_in_img)]),
         'gt_boxes_upright_depth': np.asarray(gt_boxes_upright_depth_list)
     }
 
@@ -188,39 +184,22 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
 
     # TODO: Verify depth coordinates
 
-if __name__ == "__main__":
-    
-    args = parse_args()
-    SPLIT = args.split
-    PHYSION_HDF5_ROOT = "/home/kalyanav/MS_thesis/tr3d_data/physion/HDF5/" + f"{SPLIT}"
-    PREV_PKL_FILE_PATH = "/home/kalyanav/MS_thesis/tr3d_data/physion" + f"/{SPLIT}.pkl"
-    OBJ_TYPE_LIST_PATH = "/home/kalyanav/MS_thesis/tr3d_data/physion" + f"/{SPLIT}.txt"
 
-    # PHYSION_RGB_PATH = "/home/kashis/Desktop/Eval7/tr3d/physion"
 
-    STORE_PATH_ROOT = "/home/kalyanav/MS_thesis/tr3d_data/physion"
-    data_infos = []
-    img_idx = 0
-    start = 50
-    frames_per_vid = 20
-    for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
-        for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
-            if os.path.join(PHYSION_HDF5_ROOT, _file, filename).endswith('hdf5'):
-                vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, _file, filename) 
-                print("Looking at : ", os.path.join(_file, filename))
-                try:
-                    with h5py.File(vid_hdf5_path, 'r') as file:
-                        for frame_id in list(file["frames"].keys())[start : start + frames_per_vid]:
-                            phys_dict = get_phys_dict(img_idx, _file, _file_idx, filename, frame_id)
-                            print(filename, frame_id)
-                            print("img_idx: ",img_idx)
-                            img_idx += 1
-                            data_infos.append(phys_dict)
-                except OSError:
-                    continue
-    print("All the classes present : ", global_object_types)
-    with open(OBJ_TYPE_LIST_PATH, "w") as output:
-        output.write(str(global_object_types))
-    print("Storing {} pickle file ....".format(SPLIT) )
-    with open(PREV_PKL_FILE_PATH, "wb") as pickle_file:
-        pickle.dump(data_infos, pickle_file)
+
+data_infos = []
+img_idx = 0
+start = 50
+frames_per_vid = 50
+for filename in (sorted(os.listdir(PHYSION_HDF5_ROOT))):
+    vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, filename)
+    with h5py.File(vid_hdf5_path, 'r') as file:
+        for frame_id in list(file["frames"].keys())[start : start + frames_per_vid]:
+            phys_dict = get_phys_dict(img_idx, filename, frame_id)
+            print(filename, frame_id)
+            img_idx += 1
+            data_infos.append(phys_dict)
+
+print("")
+with open(PREV_PKL_FILE_PATH, "wb") as pickle_file:
+    pickle.dump(data_infos, pickle_file)
