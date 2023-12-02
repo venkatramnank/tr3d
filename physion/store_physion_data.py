@@ -52,7 +52,7 @@ def get_phys_dict(img_idx, filename, frame_id):
     f_obj = file["frames"]
     rgb = f_obj[frame_id]["images"]["_img"][:]
     image = Image.open(io.BytesIO(rgb))
-    image = ImageOps.mirror(image)
+    # image = ImageOps.mirror(image)
     RGB_IMG_PATH = os.path.join(STORE_PATH_ROOT, "phys_trainval", "image") + "/" + file_frame_combined_name + ".jpg"
     image.save(RGB_IMG_PATH)
 
@@ -62,14 +62,14 @@ def get_phys_dict(img_idx, filename, frame_id):
 
     pcd_info = {
         'num_features': 6,
-        'lidar_idx': 1
+        'lidar_idx': img_idx
     }
 
     pts_path = 'points/' + file_frame_combined_name + '.bin'
 
     # TODO: Verify image_idx
     image_obj = {
-        'image_idx': 1,
+        'image_idx': img_idx,
         'image_shape': [img_height, img_width],
         'image_path': 'image/' + file_frame_combined_name + '.jpg'
     }
@@ -106,7 +106,7 @@ def get_phys_dict(img_idx, filename, frame_id):
         seg_color = s_obj["object_segmentation_colors"][seg_id]
         seg = f_obj[frame_id]["images"]["_id"][:]
         image = Image.open(io.BytesIO(seg))
-        image = ImageOps.mirror(image)
+        # image = ImageOps.mirror(image)
         seg_numpy_arr = np.array(image)
         seg_mask = (seg_numpy_arr == seg_color).all(-1)
         seg_mask = seg_mask.astype(np.uint8)
