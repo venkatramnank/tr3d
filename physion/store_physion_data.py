@@ -198,13 +198,13 @@ if __name__ == "__main__":
     
     args = parse_args()
     SPLIT = args.split
-    PHYSION_HDF5_ROOT = "/home/kalyanav/MS_thesis/tr3d_data/physion/HDF5/" + f"{SPLIT}"
-    PREV_PKL_FILE_PATH = "/home/kalyanav/MS_thesis/tr3d_data/physion" + f"/{SPLIT}.pkl"
-    OBJ_TYPE_LIST_PATH = "/home/kalyanav/MS_thesis/tr3d_data/physion" + f"/{SPLIT}.txt"
+    PHYSION_HDF5_ROOT = "/tr3d_data/physion/HDF5/" + f"{SPLIT}"
+    PREV_PKL_FILE_PATH = "/tr3d_data/physion" + f"/{SPLIT}.pkl"
+    OBJ_TYPE_LIST_PATH = "/r3d_data/physion" + f"/{SPLIT}.txt"
 
     # PHYSION_RGB_PATH = "/home/kashis/Desktop/Eval7/tr3d/physion"
 
-    STORE_PATH_ROOT = "/home/kalyanav/MS_thesis/tr3d_data/physion"
+    STORE_PATH_ROOT = "/tr3d_data/physion"
     data_infos = []
     img_idx = 0
     start = 50
