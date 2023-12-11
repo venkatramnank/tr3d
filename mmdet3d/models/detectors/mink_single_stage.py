@@ -2,14 +2,16 @@
 # Adapted from https://github.com/SamsungLabs/fcaf3d/blob/master/mmdet3d/models/detectors/single_stage_sparse.py # noqa
 try:
     import MinkowskiEngine as ME
+    # ME.set_memory_manager_backend(ME.MemoryManagerBackend.CUDA) #Does not work
 except ImportError:
     import warnings
     warnings.warn(
         'Please follow `getting_started.md` to install MinkowskiEngine.`')
-
+from memory_profiler import profile
 from mmdet3d.core import bbox3d2result
 from mmdet3d.models import DETECTORS, build_backbone, build_head, build_neck
 from .base import Base3DDetector
+from tools.data_converter.voxelize_mlpointconvformer import *
 
 
 @DETECTORS.register_module()
@@ -51,7 +53,7 @@ class MinkSingleStage3DDetector(Base3DDetector):
 
     def extract_feat(self, *args):
         """Just implement @abstractmethod of BaseModule."""
-
+    # @profile
     def extract_feats(self, points):
         """Extract features from points.
 
@@ -61,11 +63,21 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             SparseTensor: Voxelized point clouds.
         """
+       # voxelization with voxel size of 0.05 
+        points = [p[voxelize(p, voxel_size=0.05)] for p in points]
+        # import pdb; pdb.set_trace()
+        # coordinates, features = ME.utils.batch_sparse_collate(
+        #     [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
+        #     device=points[0].device) 
         coordinates, features = ME.utils.batch_sparse_collate(
-            [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
-            device=points[0].device)
+            [(p[:, :3], p[:, 3:]) for p in points],
+            device=points[0].device) 
+        #collates all the points in the batch. Total number of points x 4 [batch number, x, y, z]
+        # features shape is (total number of points x 3)[r,g,b]
         x = ME.SparseTensor(coordinates=coordinates, features=features)
+
         x = self.backbone(x)
+        
         if self.with_neck:
             x = self.neck(x)
         return x
@@ -83,9 +95,11 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             dict: Centerness, bbox and classification loss values.
         """
+        import pdb; pdb.set_trace()
         x = self.extract_feats(points)
         losses = self.head.forward_train(x, gt_bboxes_3d, gt_labels_3d,
                                          img_metas)
+        
         return losses
 
     def simple_test(self, points, img_metas, *args, **kwargs):

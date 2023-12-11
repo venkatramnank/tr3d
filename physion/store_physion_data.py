@@ -15,7 +15,8 @@ from physion_tools import PhysionPointCloudGenerator
 import argparse
 
 global_object_types = set()
-
+CRUCIAL_OBJECTS = [b'cloth_square', b'buddah', b'bowl', b'cone', b'cube', b'cylinder', b'dumbbell', b'octahedron', b'pentagon', b'pipe', b'platonic', b'pyramid', b'sphere', b'torus', b'triangular_prism']
+CRUCIAL_OBJECTS_CLASS = {element:index for index, element in enumerate(CRUCIAL_OBJECTS)}
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--split', type=str, help="Train or validation split")
@@ -94,22 +95,26 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     gt_boxes_upright_depth_list = []
     heading_ang = []
     names_list = []
+    index_list = []
 
     for seg_id in range(num_segments_in_img):
-        # obj_name = s_obj['model_names'][:][seg_id]
-        # if obj_name in s_obj['distractors'][:]:
-        #     continue
-        # if obj_name in s_obj['occluders'][:]:
-        #     continue
+
+        obj_name = s_obj['model_names'][:][seg_id]
+        if obj_name in s_obj['distractors'][:]:
+            continue
+        if obj_name in s_obj['occluders'][:]:
+            continue
+        if obj_name not in CRUCIAL_OBJECTS:
+            continue
 
 
         seg_color = s_obj["object_segmentation_colors"][seg_id]
-        object_name = s_obj['model_names'][seg_id].decode('utf-8')
+        # object_name = s_obj['model_names'][seg_id].decode('utf-8')
         # Adding to the set in order to see different types of objects
-        global_object_types.add(object_name)
+    
         seg = f_obj[frame_id]["images"]["_id"][:]
         image = Image.open(io.BytesIO(seg))
-        image = ImageOps.mirror(image)
+        # image = ImageOps.mirror(image)
         seg_numpy_arr = np.array(image)
         seg_mask = (seg_numpy_arr == seg_color).all(-1)
         seg_mask = seg_mask.astype(np.uint8)
@@ -152,7 +157,8 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         #TODO Check (x, y, z, x_size, y_size, z_size, yaw) x_size, y_size, z_size ordering
         gt_boxes_upright_depth = [center_x, center_y, center_z, length_val, height_val, width_val, yaw]
         gt_boxes_upright_depth_list.append(gt_boxes_upright_depth)
-        names_list.append(object_name)
+        names_list.append(obj_name.decode('utf-8'))
+        index_list.append(CRUCIAL_OBJECTS_CLASS[obj_name])
 
     
         
@@ -164,19 +170,19 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     num_segments_in_img = len(gt_boxes_upright_depth_list)
     annos = {
         'gt_num': num_segments_in_img,
-        'name': np.asarray(['object' for _ in range(num_segments_in_img)]),
+        'name': np.asarray(names_list),
         'bbox': np.asarray(bbox_list),
         'location': np.asarray(location_list),
         'dimensions': np.asarray(dimensions_list),
         # TODO Verify rotation_y is one angle per object? [1 x num_objs]?
         'rotation_y': np.asarray(heading_ang),
         'index': np.asarray([i for i in range(num_segments_in_img)]),
-        'class': np.asarray([0 for _ in range(num_segments_in_img)], dtype=np.int32),
+        # 'class': np.asarray([0 for _ in range(num_segments_in_img)], dtype=np.int32),
+        'class': np.asarray(index_list),
         'gt_boxes_upright_depth': np.asarray(gt_boxes_upright_depth_list)
     }
 
     assert len(gt_boxes_upright_depth_list) == annos['gt_num']
-    
 
     return {
         'point_cloud': pcd_info,
@@ -185,7 +191,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         'calib': calib,
         'annos': annos
     }
-
+    
     # TODO: Verify depth coordinates
 
 if __name__ == "__main__":

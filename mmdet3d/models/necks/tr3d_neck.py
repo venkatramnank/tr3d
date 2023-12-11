@@ -7,7 +7,7 @@ except ImportError:
         'Please follow `getting_started.md` to install MinkowskiEngine.`')
 
 from torch import nn
-
+from memory_profiler import profile
 from mmcv.runner import BaseModule
 from mmdet3d.models.builder import NECKS
 
@@ -41,7 +41,7 @@ class TR3DNeck(BaseModule):
             if isinstance(m, ME.MinkowskiBatchNorm):
                 nn.init.constant_(m.bn.weight, 1)
                 nn.init.constant_(m.bn.bias, 0)
-
+    # @profile
     def forward(self, x):
         x = x[1:]
         outs = []
@@ -50,10 +50,12 @@ class TR3DNeck(BaseModule):
         for i in range(len(inputs) - 1, -1, -1):
             if i < len(inputs) - 1:
                 x = self.__getattr__(f'up_block_{i + 1}')(x)
+                # import pdb; pdb.set_trace()
                 x = inputs[i] + x
                 x = self.__getattr__(f'lateral_block_{i}')(x)
                 out = self.__getattr__(f'out_block_{i}')(x)
                 outs.append(out)
+        
         return outs[::-1]
 
 
