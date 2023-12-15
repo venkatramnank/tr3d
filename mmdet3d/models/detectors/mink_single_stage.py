@@ -10,6 +10,7 @@ except ImportError:
 from mmdet3d.core import bbox3d2result
 from mmdet3d.models import DETECTORS, build_backbone, build_head, build_neck
 from .base import Base3DDetector
+from tools.data_converter.voxelize_mlpointconvformer import *
 
 
 @DETECTORS.register_module()
@@ -61,9 +62,16 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             SparseTensor: Voxelized point clouds.
         """
+       # voxelization with voxel size of 0.05 
+        points = [p[voxelize(p[:, :3], voxel_size=0.05)] for p in points]
+        # coordinates, features = ME.utils.batch_sparse_collate(
+        #     [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
+        #     device=points[0].device) 
         coordinates, features = ME.utils.batch_sparse_collate(
-            [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
-            device=points[0].device)
+            [(p[:, :3], p[:, 3:]) for p in points],
+            device=points[0].device) 
+        #collates all the points in the batch. Total number of points x 4 [batch number, x, y, z]
+        # features shape is (total number of points x 3)[r,g,b]
         x = ME.SparseTensor(coordinates=coordinates, features=features)
         x = self.backbone(x)
         if self.with_neck:
