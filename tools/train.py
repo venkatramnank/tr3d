@@ -112,41 +112,9 @@ def parse_args():
 
     return args
 
-class dummy:
-    pass
 
 def main():
-    # args = parse_args()
-    args_dict = {
-        "out": None,
-        "eval": "mAP",
-        "format_only": None,
-        "show": True,
-        "show_dir": "work_dirs/tr3d_physion",
-        "config": "/home/kalyanav/MS_thesis/mmdetection3d/configs/tr3d/tr3d_physion_config.py",
-        # "config": "/home/kalyanav/MS_thesis/mmdetection3d/configs/tr3d/tr3d_physion_ff_config.py",
-        # "config": "/home/kalyanav/MS_thesis/mmdetection3d/configs/tr3d/tr3d_sunrgbd-3d-10class.py",
-        # "config": "/home/kalyanav/MS_thesis/mmdetection3d/configs/tr3d/tr3d-ff_sunrgbd-3d-10class.py",
-        "checkpoint": "/home/kalyanav/MS_thesis/mmdetection3d/checkpoints/physion_bs_4_run_0.pth",
-        # "checkpoint": "/home/kalyanav/MS_thesis/mmdetection3d/ch eckpoints/sunrgbd.pth",
-        "cfg_options": None,
-        "gpu_ids": None,
-        "gpu_id": 0,
-        "launcher": 'none',
-        "seed": None,
-        "diff_seed": False,
-        "fuse_conv_bn": False,
-        "out_dir": "/home/kalyanav/MS_thesis/mmdetection3d/results_vis/physion",
-        "work_dir": "output",
-        "resume_from": None,
-        "auto_resume": False,
-        "no_validate": False,
-        "deterministic": None,
-        "gpus": None,
-        "autoscale_lr": None
-    }  
-    args = dummy()
-    args.__dict__ = args_dict
+    args = parse_args()
 
     cfg = Config.fromfile(args.config)
     if args.cfg_options is not None:
@@ -253,7 +221,7 @@ def main():
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
- 
+
     logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:

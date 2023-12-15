@@ -18,7 +18,7 @@ model = dict(
         assigner=dict(
             type='TR3DAssigner',
             top_pts_threshold=6,
-            label2level=[0, 0, 1, 1, 1, 1, 0, 0,0, 1, 0, 0, 1 ,0, 0]),
+            label2level=[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]),
         bbox_loss=dict(type='RotatedIoU3DLoss', mode='diou', reduction='none')),
     train_cfg=dict(),
     test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.01))

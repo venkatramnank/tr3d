@@ -202,8 +202,6 @@ if __name__ == "__main__":
     PREV_PKL_FILE_PATH = "/tr3d_data/physion" + f"/{SPLIT}.pkl"
     OBJ_TYPE_LIST_PATH = "/r3d_data/physion" + f"/{SPLIT}.txt"
 
-    # PHYSION_RGB_PATH = "/home/kashis/Desktop/Eval7/tr3d/physion"
-
     STORE_PATH_ROOT = "/tr3d_data/physion"
     data_infos = []
     img_idx = 0
@@ -224,9 +222,6 @@ if __name__ == "__main__":
                             data_infos.append(phys_dict)
                 except OSError:
                     continue
-    print("All the classes present : ", global_object_types)
-    with open(OBJ_TYPE_LIST_PATH, "w") as output:
-        output.write(str(global_object_types))
     print("Storing {} pickle file ....".format(SPLIT) )
     with open(PREV_PKL_FILE_PATH, "wb") as pickle_file:
         pickle.dump(data_infos, pickle_file)
