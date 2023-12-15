@@ -326,7 +326,7 @@ class PhysionPointCloudGenerator:
         return complete_pcd
 
 
-def bbox_3d_visualizer(points, bbox_params, bbox_color=(0, 1, 0), rot_axis=2, center_mode=None):
+def bbox_3d_visualizer(points, bbox_params, bbox_color=(0, 1, 0), rot_axis=2, center_mode='lidar_bottom'):
     """
     Draw bbox on visualizer and change the color of points inside bbox3d.
 
@@ -357,7 +357,8 @@ def bbox_3d_visualizer(points, bbox_params, bbox_color=(0, 1, 0), rot_axis=2, ce
             center[rot_axis] += dim[rot_axis] / 2  # bottom center to gravity center
         elif center_mode == 'camera_bottom':
             center[rot_axis] -= dim[rot_axis] / 2  # bottom center to gravity center
-
+        elif center_mode == 'physion':
+            center[rot_axis] += (dim[rot_axis] / 2) + 2
         box3d = o3d.geometry.OrientedBoundingBox(center, rot_mat, dim)
 
         line_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(box3d)
