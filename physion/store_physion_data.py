@@ -1,6 +1,7 @@
 import warnings
 import h5py
 import os
+from matplotlib.collections import PolyCollection
 import numpy as np
 import io
 from PIL import Image, ImageOps
@@ -12,11 +13,15 @@ import math
 from mpl_toolkits.mplot3d import Axes3D
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
 from physion_tools import PhysionPointCloudGenerator
+import matplotlib.pyplot as plt, numpy as np
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import argparse
 
 global_object_types = set()
 CRUCIAL_OBJECTS = [b'cloth_square', b'buddah', b'bowl', b'cone', b'cube', b'cylinder', b'dumbbell', b'octahedron', b'pentagon', b'pipe', b'platonic', b'pyramid', b'sphere', b'torus', b'triangular_prism']
 CRUCIAL_OBJECTS_CLASS = {element:index for index, element in enumerate(CRUCIAL_OBJECTS)}
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--split', type=str, help="Train or validation split")
@@ -44,6 +49,52 @@ def get_bbox_from_seg_mask(seg_mask):
     width = np.max(a[1]) - np.min(a[1])
     top_left = (np.min(a[1]), np.min(a[0]))
     return [top_left[0], top_left[1], width, height]
+
+def plot_box(points, center):
+
+    points = np.array(points)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter3D(points[:, 0], points[:, 1], points[:, 2])
+
+   # Compute the bounding box
+    min_x, max_x = np.min(points[:, 0]), np.max(points[:, 0])
+    min_y, max_y = np.min(points[:, 1]), np.max(points[:, 1])
+    min_z, max_z = np.min(points[:, 2]), np.max(points[:, 2])
+
+    # Define the vertices of the bounding box
+    vertices = np.array([
+        [min_x, min_y, min_z],
+        [max_x, min_y, min_z],
+        [max_x, max_y, min_z],
+        [min_x, max_y, min_z],
+        [min_x, min_y, max_z],
+        [max_x, min_y, max_z],
+        [max_x, max_y, max_z],
+        [min_x, max_y, max_z]
+    ])
+
+    # Define the six faces of the bounding box
+    faces = [
+        [vertices[0], vertices[1], vertices[2], vertices[3]],
+        [vertices[4], vertices[5], vertices[6], vertices[7]],
+        [vertices[0], vertices[1], vertices[5], vertices[4]],
+        [vertices[2], vertices[3], vertices[7], vertices[6]],
+        [vertices[1], vertices[2], vertices[6], vertices[5]],
+        [vertices[0], vertices[3], vertices[7], vertices[4]]
+    ]
+
+    # Plot the bounding box
+    ax.add_collection3d(Poly3DCollection(faces, linewidths=1, edgecolors='r', alpha=0.1))
+    box_dimensions = np.array([max_x - min_x, max_y - min_y, max_z - min_z])
+
+    front, back, left, right, top, bottom = points
+    width_val = abs(front[2] - back[2])
+    length_val = abs(left[0] - right[0])
+    height_val = abs(top[1] - bottom[1])
+
+    plt.show()
 
 def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
 
@@ -140,12 +191,22 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         bottom = f_obj[frame_id]["objects"]["bottom"][seg_id]
         height_val = abs(top[1] - bottom[1])
 
-        dim = [height_val, width_val, length_val]
-        dimensions_list.append(dim)
-
         center_x = f_obj[frame_id]["objects"]["center"][seg_id][0]
         center_y = f_obj[frame_id]["objects"]["center"][seg_id][1]
         center_z = f_obj[frame_id]["objects"]["center"][seg_id][2]
+
+        points = [front, back, left, right, top, bottom]
+        # center = [center_x, center_y, center_z]
+        # plot_box(points, center)
+
+        points = np.array(points)
+        min_x, max_x = np.min(points[:, 0]), np.max(points[:, 0])
+        min_y, max_y = np.min(points[:, 1]), np.max(points[:, 1])
+        min_z, max_z = np.min(points[:, 2]), np.max(points[:, 2])
+
+        bbox_3d_dims = np.array([max_x - min_x, max_y - min_y, max_z - min_z])
+        dimensions_list.append(bbox_3d_dims)
+
 
         #TODO: Check quartonion order
         [w,x,y,z] = f_obj[frame_id]["objects"]["rotations"][seg_id]
@@ -155,7 +216,8 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         heading_ang.append(yaw)
 
         #TODO Check (x, y, z, x_size, y_size, z_size, yaw) x_size, y_size, z_size ordering
-        gt_boxes_upright_depth = [center_x, center_y, center_z, length_val, height_val, width_val, yaw]
+        gt_boxes_upright_depth = [center_x, center_y, center_z, bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2], yaw]
+        # gt_boxes_upright_depth = [center_x, center_y, center_z, length_val, height_val, width_val, yaw]
         gt_boxes_upright_depth_list.append(gt_boxes_upright_depth)
         names_list.append(obj_name.decode('utf-8'))
         index_list.append(CRUCIAL_OBJECTS_CLASS[obj_name])
