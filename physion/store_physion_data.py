@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt, numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import argparse
+import open3d as o3d
 
 global_object_types = set()
 CRUCIAL_OBJECTS = [b'cloth_square', b'buddah', b'bowl', b'cone', b'cube', b'cylinder', b'dumbbell', b'octahedron', b'pentagon', b'pipe', b'platonic', b'pyramid', b'sphere', b'torus', b'triangular_prism']
@@ -96,9 +97,9 @@ def plot_box(points, center):
 
     plt.show()
 
-def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
+def get_phys_dict(img_idx, filename, frame_id):
 
-    file_frame_combined_name = filename.split(".hdf5")[0] + "_" + str(_file_idx) + "_" + frame_id
+    file_frame_combined_name = filename.split(".hdf5")[0] + "_" + frame_id
     s_obj = file["static"]
     f_obj = file["frames"]
     rgb = f_obj[frame_id]["images"]["_img"][:]
@@ -135,7 +136,8 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         'Rt': np_cam.astype(np.float32)
     }
 
-    pcd_generator = PhysionPointCloudGenerator(hdf5_file_path=os.path.join(PHYSION_HDF5_ROOT, _file, filename), frame_number=frame_id, plot=False)
+    HDF5_PATH = os.path.join(STORE_PATH_ROOT, 'HDF5', SPLIT, filename)
+    pcd_generator = PhysionPointCloudGenerator(hdf5_file_path=HDF5_PATH, frame_number=frame_id, plot=False)
     pcd = pcd_generator.run()
 
     pcd.astype('float32').tofile(os.path.join(STORE_PATH_ROOT, pts_path))
@@ -160,7 +162,6 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
 
 
         seg_color = s_obj["object_segmentation_colors"][seg_id]
-        # object_name = s_obj['model_names'][seg_id].decode('utf-8')
         # Adding to the set in order to see different types of objects
     
         seg = f_obj[frame_id]["images"]["_id"][:]
@@ -222,7 +223,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         names_list.append(obj_name.decode('utf-8'))
         index_list.append(CRUCIAL_OBJECTS_CLASS[obj_name])
 
-    
+
         
     # # Visualize point cloud
     # vis = Visualizer(pcd, bbox3d=np.asarray(gt_boxes_upright_depth_list), mode="xyzrgb")
@@ -269,21 +270,13 @@ if __name__ == "__main__":
     img_idx = 0
     start = 50
     frames_per_vid = 20
-    for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
-        for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
-            if os.path.join(PHYSION_HDF5_ROOT, _file, filename).endswith('hdf5'):
-                vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, _file, filename) 
-                print("Looking at : ", os.path.join(_file, filename))
-                try:
-                    with h5py.File(vid_hdf5_path, 'r') as file:
-                        for frame_id in list(file["frames"].keys())[start : start + frames_per_vid]:
-                            phys_dict = get_phys_dict(img_idx, _file, _file_idx, filename, frame_id)
-                            print(filename, frame_id)
-                            print("img_idx: ",img_idx)
-                            img_idx += 1
-                            data_infos.append(phys_dict)
-                except OSError:
-                    continue
-    print("Storing {} pickle file ....".format(SPLIT) )
+    for filename in (sorted(os.listdir(PHYSION_HDF5_ROOT))):
+        vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, filename)
+        with h5py.File(vid_hdf5_path, 'r') as file:
+            for frame_id in list(file["frames"].keys())[start : start + frames_per_vid]:
+                phys_dict = get_phys_dict(img_idx, filename, frame_id)
+                print(filename, frame_id)
+                img_idx += 1
+                data_infos.append(phys_dict)
     with open(PREV_PKL_FILE_PATH, "wb") as pickle_file:
         pickle.dump(data_infos, pickle_file)
