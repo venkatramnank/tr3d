@@ -411,28 +411,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         center_y = f_obj[frame_id]["objects"]["center"][seg_id][1]
         center_z = f_obj[frame_id]["objects"]["center"][seg_id][2]
         
-        bbox_points_for_plotting = np.array([front, back, left, right, top, bottom, center])
-        # location_list.append(convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["center"][seg_id]))
- 
-        # center = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["center"][seg_id])
-        # front = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["front"][seg_id])
-        # back = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["back"][seg_id])
-        # width_val = abs(front[:, 2] - back[:, 2])
 
-        # left = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["left"][seg_id])
-        # right = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["right"][seg_id])
-        # length_val = abs(left[:, 0] - right[:, 0])
-
-        # top = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["top"][seg_id])
-        # bottom = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["bottom"][seg_id])
-        # height_val = abs(top[:, 1] - bottom[:, 1])
-
-        # dim = [height_val, width_val, length_val]
-        # dimensions_list.append(dim)
-
-        # center_x = center[:, 0]
-        # center_y = center[:, 1]
-        # center_z = center[:, 2]
         #TODO: Check quartonion order
         [x,y,z, w] = f_obj[frame_id]["objects"]["rotations"][seg_id]
         t = f_obj[frame_id]["objects"]["positions"][seg_id]
@@ -440,61 +419,27 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         # R = get_rotation_matrix(x,y,z,w)
         
         points = [front, back, left, right, top, bottom]
-        # center = [center_x, center_y, center_z]
-        # plot_box(points, center)
-
-            
-        # Trying the scaled and transformed points
-        # center_new =  apply_transform(center.reshape(1,3), R, t, scale).squeeze(0)
-        # front_new =  apply_transform(front.reshape(1,3), R, t, scale).squeeze(0)
-        # back_new =  apply_transform(back.reshape(1,3), R, t, scale).squeeze(0)
-        # top_new =  apply_transform(top.reshape(1,3), R, t, scale).squeeze(0)
-        # bottom_new =  apply_transform(bottom.reshape(1,3), R, t, scale).squeeze(0)
-        # left_new =  apply_transform(left.reshape(1,3), R, t, scale).squeeze(0)
-        # right_new =  apply_transform(right.reshape(1,3), R, t, scale).squeeze(0)    
-        # points = [front_new, back_new, left_new, right_new, top_new, bottom_new]
-
         points = np.array(points)
-        min_x, max_x = np.min(points[:, 0]), np.max(points[:, 0])
-        min_y, max_y = np.min(points[:, 1]), np.max(points[:, 1])
-        min_z, max_z = np.min(points[:, 2]), np.max(points[:, 2])
-
-        bbox_3d_dims = np.array([max_x - min_x, max_y - min_y, max_z - min_z])
-        dimensions_list.append(bbox_3d_dims)
-
 
         def calculate_bounding_box_dimensions(points):
-            # Ensure points is a list of NumPy arrays
             
             points = [np.array(point) for point in points]
-
-            # Calculate Length
             length = np.linalg.norm(points[0] - points[1])
-
-            # Calculate Width
             width = np.linalg.norm(points[2] - points[3])
-
-            # Calculate Height
             height = np.linalg.norm(points[4] - points[5])
 
             return [length, width, height]
         
-        bbox_3d_dims_new = calculate_bounding_box_dimensions(points)
-        
-       
-        #TODO Check is rotation_y == yaw?
+        bbox_3d_dims = calculate_bounding_box_dimensions(points)
+        dimensions_list.append(bbox_3d_dims)
+
         yaw = math.atan2(2.0*(y*z + x*y), w*w + x*x - y*y - z*z)
         heading_ang.append(yaw)
 
-        #TODO Check (x, y, z, x_size, y_size, z_size, yaw) x_size, y_size, z_size ordering
-        # gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2], yaw]
-        # gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2], x, y, z, w, t[0], t[1], t[2]]
-        gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims_new[1], bbox_3d_dims_new[2], bbox_3d_dims_new[0], x, y, z, w]
-        # gt_boxes_upright_depth = [center_x , center_y, center_z, length_val.item(), height_val.item(), width_val.item(), x, y, z, w, t[0], t[1], t[2]]
+
+        gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0], x, y, z, w]
         bbox_points = [center, front, back, left, right, top, bottom]
-        # gt_boxes_upright_depth = [center_x , center_y, center_z, length_val, height_val, width_val, x, y, z, w, t[0], t[1], t[2]]
-        # gt_boxes_upright_depth = [center_new[0], center_new[1], center_new[2], bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2], yaw]
-        # gt_boxes_upright_depth = [center_x, center_y, center_z, length_val, height_val, width_val, yaw]
+
         gt_boxes_upright_depth_list.append(gt_boxes_upright_depth)
         bbox_points_list.append(bbox_points)
         names_list.append(obj_name.decode('utf-8'))
