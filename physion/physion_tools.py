@@ -40,8 +40,10 @@ class PhysionPointCloudGenerator:
         self.img_width = self.img_array.shape[1]
         self.seg_array = self.io2image(
             self.hf["frames"][self.frame_number]["images"]["_id"][:])
+        #NOTE: Changed the dep_array ==> divide by 10
         self.dep_array = self.get_depth_values(
-            self.hf["frames"][self.frame_number]["images"]["_depth"][:], width=self.img_width, height=self.img_height, near_plane=0.1, far_plane=100)
+            self.hf["frames"][self.frame_number]["images"]["_depth"][:], width=self.img_width, height=self.img_height, near_plane=0.1, far_plane=100, depth_pass='_depth')
+        self.dep_array = np.where(self.dep_array > 80, 0, self.dep_array) #NOTE: Removal of far away depth
         self.positions = self.hf["frames"][self.frame_number]["objects"]["positions"][:]
         self.rotations = self.hf["frames"][self.frame_number]["objects"]["rotations"][:]
         self.plot = plot
@@ -56,7 +58,7 @@ class PhysionPointCloudGenerator:
             numpy.ndarray: H x W x 3 image
         """
         image = Image.open(io.BytesIO(tmp))
-        # image = ImageOps.mirror(image)
+        image = ImageOps.mirror(image)
 
         image_array = np.array(image)
         return image_array
@@ -74,11 +76,12 @@ class PhysionPointCloudGenerator:
         :param far_plane: The far clipping plane. See command `set_camera_clipping_planes`. The default value in this function is the default value of the far clipping plane.
         :return An array of depth values.
         """
-        # image = np.flip(np.reshape(image, (height, width, 3)), 1)
-        image = np.reshape(image, (height, width, 3))
-
+        image = np.flip(np.reshape(image, (height, width, 3)), 1)
+        # image = np.reshape(image, (height, width, 3))
+        
         # Convert the image to a 2D image array.
         if depth_pass == "_depth":
+
             depth_values = np.array(
                 (image[:, :, 0] + image[:, :, 1] / 256.0 + image[:, :, 2] / (256.0 ** 2)))
         elif depth_pass == "_depth_simple":
@@ -123,6 +126,7 @@ class PhysionPointCloudGenerator:
         Returns:
             numpy.ndarray: 3D coordinates
         """
+
         z = np.array(z)
         assert z.ndim >= 3
         h, w, _ = z.shape[-3:]
@@ -163,40 +167,71 @@ class PhysionPointCloudGenerator:
         frame_depth_array = np.array(frame_images.get('_depth'))
         return frame_depth_array
 
+    # def convert_2D_to_3D(self, obj_2D, camera_matrix, projection_matrix, target_resolution=(256, 256)):
+    #     """
+    #     Convert 2D coordinates to 3D coordinates using camera and projection matrices.
+
+    #     Args:
+    #         obj_2D (numpy.ndarray): Array of 2D coordinates with shape (num_points, 3),
+    #                                 where each row represents (x, y, depth).
+    #         camera_matrix (numpy.ndarray): Camera matrix for the 3D-to-2D projection.
+    #         projection_matrix (numpy.ndarray): Projection matrix for transforming normalized device coordinates.
+    #         target_resolution (tuple, optional): Target resolution of the 2D coordinates. Defaults to (256, 256).
+
+    #     Returns:
+    #         numpy.ndarray: Array of transformed 3D coordinates with shape (num_points, 3).
+    #     """
+    #     obj_num = obj_2D.shape[0]
+    #     obj_2D = np.concatenate([obj_2D[:, 1:2],
+    #                             obj_2D[:, 0:1],
+    #                             obj_2D[:, 2:3],
+    #                              ], axis=1).astype(np.float32)
+
+    #     obj_2D[:, 1] = 1 - obj_2D[:, 1]/target_resolution[1]
+    #     obj_2D[:, 0] = obj_2D[:, 0]/target_resolution[0]
+    #     obj_2D[:, :2] = obj_2D[:, :2] * 2 - 1
+
+    #     obj_3D = np.concatenate([obj_2D[:, :2] * obj_2D[:, 2:3],
+    #                              obj_2D[:, 2:3],
+    #                             (obj_2D[:, 2:3] - 1.0 *
+    #                              projection_matrix[2, 3])
+    #                             / projection_matrix[2, 2] * projection_matrix[3, 2]],
+    #                             axis=1)
+
+    #     obj_3D = np.linalg.inv(projection_matrix) @ obj_3D.T #image coodinate normalization
+
+    #     obj_3D = (np.linalg.inv(camera_matrix) @ obj_3D).T
+    #     return obj_3D[:, :3]
+    
     def convert_2D_to_3D(self, obj_2D, camera_matrix, projection_matrix, target_resolution=(256, 256)):
-        """
-        Convert 2D coordinates to 3D coordinates using camera and projection matrices.
-
-        Args:
-            obj_2D (numpy.ndarray): Array of 2D coordinates with shape (num_points, 3),
-                                    where each row represents (x, y, depth).
-            camera_matrix (numpy.ndarray): Camera matrix for the 3D-to-2D projection.
-            projection_matrix (numpy.ndarray): Projection matrix for transforming normalized device coordinates.
-            target_resolution (tuple, optional): Target resolution of the 2D coordinates. Defaults to (256, 256).
-
-        Returns:
-            numpy.ndarray: Array of transformed 3D coordinates with shape (num_points, 3).
-        """
-        obj_num = obj_2D.shape[0]
+        obj_num = obj_2D.shape[0]    
+        # obj_2D[:, 1] = 1 - obj_2D[:, 1]/target_resolution[1]
+        # obj_2D[:, 0] = obj_2D[:, 0]/target_resolution[0]
         obj_2D = np.concatenate([obj_2D[:, 1:2],
                                 obj_2D[:, 0:1],
                                 obj_2D[:, 2:3],
-                                 ], axis=1).astype(np.float32)
-
+                                ], axis=1).astype(np.float32)
+        
         obj_2D[:, 1] = 1 - obj_2D[:, 1]/target_resolution[1]
-        obj_2D[:, 0] = obj_2D[:, 0]/target_resolution[0]
+        # obj_2D[:, 1] = obj_2D[:, 1]/target_resolution[1]
+        obj_2D[:, 0] = 1-  obj_2D[:, 0]/target_resolution[0]
+
         obj_2D[:, :2] = obj_2D[:, :2] * 2 - 1
-
-        obj_3D = np.concatenate([obj_2D[:, :2] * obj_2D[:, 2:3],
-                                 obj_2D[:, 2:3],
-                                (obj_2D[:, 2:3] - 1.0 *
-                                 projection_matrix[2, 3])
-                                / projection_matrix[2, 2] * projection_matrix[3, 2]],
+        # print(obj_2D)
+        obj_3D =  np.concatenate([obj_2D[:, :2] * obj_2D[:, 2:3],
+                                obj_2D[:, 2:3]], 
                                 axis=1)
+        
+        projection_matrix_new=np.concatenate([projection_matrix[:2,:3],
+                                                projection_matrix[3:4,:3],
+                                                ],axis=0)
+        # print(projection_matrix_new)
+        # print(np.linalg.inv(projection_matrix_new))
+        obj_3D = np.linalg.inv(projection_matrix_new) @ obj_3D.T
 
-        obj_3D = np.linalg.inv(projection_matrix) @ obj_3D.T
-
-        obj_3D = (np.linalg.inv(camera_matrix) @ obj_3D).T
+        ones = np.ones((1,obj_num))
+        obj_3D = np.concatenate((obj_3D, ones), axis=0)   
+        obj_3D = (np.linalg.inv(camera_matrix) @ obj_3D ).T
         return obj_3D[:, :3]
 
     def background_pc(self, size, ind_i_all, ind_j_all, true_z_f, rgb_f, camera_matrix, projection_matrix):
@@ -261,7 +296,7 @@ class PhysionPointCloudGenerator:
         Returns:
             np.array: PCD [points x 6]; xyzrgb
         """
-
+        
         obj_depth_point_world_f = []
         obj_partial_rgb_f = []
         ind_i_all, ind_j_all = [], []
@@ -322,52 +357,61 @@ class PhysionPointCloudGenerator:
 
         if self.plot:
             self.pcd_visualizer_with_color(complete_pcd_world, complete_pcd_colors)
-        
+
         return complete_pcd
 
 
-def bbox_3d_visualizer(points, bbox_params, bbox_color=(0, 1, 0), rot_axis=2, center_mode=None):
-    """
-    Draw bbox on visualizer and change the color of points inside bbox3d.
+class PointCloudVisualizer:
+    def __init__(self):
+        self.vis = o3d.visualization.Visualizer()
+        self.vis.create_window()
 
-    Args:
-        pcd (:obj:`open3d.geometry.PointCloud`): point cloud of shape (points x 6) representing xyzrgb.
-        bbox_params (list): 3d bbox (x, y, z, x_size, y_size, z_size, yaw) to visualize.
-        bbox_color (tuple[float], optional): the color of bbox.
-            Default: (0, 1, 0).
-        rot_axis (int, optional): rotation axis of bbox. Default: 2.
-        center_mode (bool, optional): indicate the center of bbox is
-            bottom center or gravity center. available mode
-            ['lidar_bottom', 'camera_bottom']. Default: None.
-    """
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points[:, :3])
-    pcd.colors = o3d.utility.Vector3dVector(points[:, 3:])
-    vis.add_geometry(pcd)
-    for i in range(len(bbox_params)):
-        center = bbox_params[i, 0:3]
-        dim = bbox_params[i, 3:6]
-        yaw = np.zeros(3)
-        yaw[rot_axis] = bbox_params[i, 6]
-        rot_mat = o3d.geometry.get_rotation_matrix_from_xyz(yaw)
+    def create_point_cloud(self, points, color):
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(points)
+        pcd.colors = o3d.utility.Vector3dVector(color)
+        return pcd
 
-        if center_mode == 'lidar_bottom':
-            center[rot_axis] += dim[rot_axis] / 2  # bottom center to gravity center
-        elif center_mode == 'camera_bottom':
-            center[rot_axis] -= dim[rot_axis] / 2  # bottom center to gravity center
+    def create_3d_bbox(self, center, dimensions, rotation_matrix, bbox_points=None, use_rot=False, use_points=False):
+        if use_rot:
+            bbox = o3d.geometry.OrientedBoundingBox(center=center, R=rotation_matrix, extent=dimensions)
+            bbox.color = (0,1,0)
+            # bbox.translate(translation)
+        else:
+            bbox = o3d.geometry.OrientedBoundingBox(center=center, R=np.eye(3, 3), extent=dimensions)
+        if use_points:
+            bbox_points_vector = o3d.utility.Vector3dVector(bbox_points)
+            bbox = o3d.geometry.OrientedBoundingBox.create_from_points(bbox_points_vector)
+        return bbox
 
-        box3d = o3d.geometry.OrientedBoundingBox(center, rot_mat, dim)
+    def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, bbox_points_list=None):
+        pcd = self.create_point_cloud(points[:, :3], points[:, 3:])
+        self.vis.add_geometry(pcd)
 
-        line_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(box3d)
-        line_set.paint_uniform_color(bbox_color)
-        # draw bboxes on visualizer
-        vis.add_geometry(line_set)
+        for gt_bbox_info in (gt_bboxes_list):
+            # if bbox_points:
+            #     bbox_colors = np.array([[0.0, 1.0, 0.0]] * 7)
+            #     pcd.points.extend(o3d.utility.Vector3dVector(bbox_points))
+            #     pcd.colors.extend(o3d.utility.Vector3dVector(bbox_colors))
+            center, dimensions, quartenion = (
+                gt_bbox_info[:3],
+                gt_bbox_info[3:6],
+                gt_bbox_info[6:10]
+            )
+            rot = R.from_quat([quartenion[0], quartenion[1], quartenion[2], quartenion[3]])
+            bbox = self.create_3d_bbox(
+                np.array(center).reshape(3, 1),
+                np.array(dimensions).reshape(3, 1),
+                rot.as_matrix(),
+                use_rot=True,
+                use_points=False,
+            )
+            
+            self.vis.add_geometry(bbox)
 
+        self.vis.get_view_control().set_front([0, 0, -1])
+        self.vis.get_view_control().set_up([0, -1, 0])
+        self.vis.get_view_control().set_lookat([1, 1, 1])
 
-    # update points colors
-    vis.update_geometry(pcd)
-    vis.run()
-    # Close the visualizer window
-    vis.destroy_window()
+        self.vis.run()
+        self.vis.destroy_window()

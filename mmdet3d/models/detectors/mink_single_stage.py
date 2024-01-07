@@ -11,6 +11,7 @@ from mmdet3d.core import bbox3d2result
 from mmdet3d.models import DETECTORS, build_backbone, build_head, build_neck
 from .base import Base3DDetector
 from tools.data_converter.voxelize_mlpointconvformer import *
+from mmdet3d.core.visualizer.open3d_vis import Visualizer
 
 
 @DETECTORS.register_module()
@@ -63,7 +64,9 @@ class MinkSingleStage3DDetector(Base3DDetector):
             SparseTensor: Voxelized point clouds.
         """
        # voxelization with voxel size of 0.05 
-        points = [p[voxelize(p[:, :3], voxel_size=0.05)] for p in points]
+        
+        points = [p[voxelize(p[:, :3], self.voxel_size)] for p in points]  # [65536 x 6] [] [] ... b #TODO: visualize it once
+        # import pdb; pdb.set_trace()
         # coordinates, features = ME.utils.batch_sparse_collate(
         #     [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
         #     device=points[0].device) 
@@ -91,7 +94,14 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             dict: Centerness, bbox and classification loss values.
         """
+        import pdb; pdb.set_trace()
+        ######################################################################################
+        # visualizing the points and gt_bboxes_3d to make sure it is alright
+        vis = Visualizer(points, bbox3d=np.asarray(gt_bboxes_3d), mode="xyzrgb", center_mode="physion", rot_axis=1)
+        vis.show()
+        #####################################################################################
         x = self.extract_feats(points)
+        # import pdb; pdb.set_trace()
         losses = self.head.forward_train(x, gt_bboxes_3d, gt_labels_3d,
                                          img_metas)
         return losses

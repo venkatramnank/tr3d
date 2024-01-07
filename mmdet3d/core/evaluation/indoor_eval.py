@@ -69,12 +69,13 @@ def eval_det_cls(pred, gt, iou_thr=None):
     """
 
     # {img_id: {'bbox': box structure, 'det': matched list}}
+    
     class_recs = {}
     npos = 0
     for img_id in gt.keys():
         cur_gt_num = len(gt[img_id])
         if cur_gt_num != 0:
-            gt_cur = torch.zeros([cur_gt_num, 7], dtype=torch.float32)
+            gt_cur = torch.zeros([cur_gt_num, 7], dtype=torch.float32) #TODO: See the 7 value?
             for i in range(cur_gt_num):
                 gt_cur[i] = gt[img_id][i].tensor
             bbox = gt[img_id][0].new_box(gt_cur)
@@ -82,7 +83,7 @@ def eval_det_cls(pred, gt, iou_thr=None):
             bbox = gt[img_id]
         det = [[False] * len(bbox) for i in iou_thr]
         npos += len(bbox)
-        class_recs[img_id] = {'bbox': bbox, 'det': det}
+        class_recs[img_id] = {'bbox': bbox, 'det': det} #TODO: Why is this empty?
 
     # construct dets
     image_ids = []
@@ -228,6 +229,7 @@ def indoor_eval(gt_annos,
     Return:
         dict[str, float]: Dict of results.
     """
+    
     assert len(dt_annos) == len(gt_annos)
     pred = {}  # map {class_id: pred}
     gt = {}  # map {class_id: gt}
@@ -268,7 +270,7 @@ def indoor_eval(gt_annos,
             if img_id not in gt[label]:
                 gt[label][img_id] = []
             gt[label][img_id].append(bbox)
-
+    
     rec, prec, ap = eval_map_recall(pred, gt, metric)
     ret_dict = dict()
     header = ['classes']

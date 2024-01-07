@@ -1,4 +1,4 @@
-voxel_size = .01 #NOTE: Increased voxel size
+voxel_size = .05 #NOTE: Increased voxel size
 n_points = 65536
 
 model = dict(
@@ -13,12 +13,12 @@ model = dict(
         type='TR3DHead',
         in_channels=128,
         n_reg_outs=8,
-        n_classes=15,
+        n_classes=1,
         voxel_size=voxel_size,
         assigner=dict(
             type='TR3DAssigner',
             top_pts_threshold=6,
-            label2level=[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]),
+            label2level=[1]),
         bbox_loss=dict(type='RotatedIoU3DLoss', mode='diou', reduction='none')),
     train_cfg=dict(),
     test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.01))
@@ -45,8 +45,9 @@ resume_from = None
 workflow = [('train', 1)]
 
 dataset_type = 'SUNRGBDDataset'
-data_root = 'data/physion/'
-class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
+data_root = '/home/kalyanav/MS_thesis/tr3d_data/physion/'
+# class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
+class_names = ['object']
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',

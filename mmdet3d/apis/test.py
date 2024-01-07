@@ -44,6 +44,7 @@ def single_gpu_test(model,
             # 'show_results' is MMdetection3D visualization API
             models_3d = (Base3DDetector, Base3DSegmentor,
                          SingleStageMono3DDetector)
+            
             if isinstance(model.module, models_3d):
                 model.module.show_results(
                     data,

@@ -12,11 +12,13 @@ import matplotlib.pyplot as plt
 import math
 from mpl_toolkits.mplot3d import Axes3D
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
-from physion_tools import PhysionPointCloudGenerator
+from physion_tools import PhysionPointCloudGenerator, PointCloudVisualizer
 import matplotlib.pyplot as plt, numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import argparse
+import open3d as o3d
+from scipy.spatial.transform import Rotation as R
 
 global_object_types = set()
 CRUCIAL_OBJECTS = [b'cloth_square', b'buddah', b'bowl', b'cone', b'cube', b'cylinder', b'dumbbell', b'octahedron', b'pentagon', b'pipe', b'platonic', b'pyramid', b'sphere', b'torus', b'triangular_prism']
@@ -95,6 +97,215 @@ def plot_box(points, center):
     height_val = abs(top[1] - bottom[1])
 
     plt.show()
+    
+    
+def convert_camera_to_world(camera_matrix, projection_matrix, obj_2D):
+    """
+    Convert 2D coordinates in camera space to 3D coordinates in world space.
+
+    Args:
+        camera_matrix (numpy.ndarray): Camera matrix for the transformation from image to camera coordinates.
+        projection_matrix (numpy.ndarray): Projection matrix for the transformation from camera to world coordinates.
+        obj_2D (numpy.ndarray): Array of 2D coordinates in camera space with shape (num_points, 3),
+                                where each row represents (x, y, depth).
+
+    Returns:
+        numpy.ndarray: Array of transformed 3D coordinates with shape (num_points, 3).
+    """
+
+    if len(obj_2D.shape) == 1:
+        obj_2D = obj_2D.reshape(1, 3)
+    # Ensure the input array has the correct shape
+    if obj_2D.shape[1] != 3:
+        raise ValueError("obj_2D should have shape (num_points, 3)")
+    
+    # Rearrange the input array to match the expected order of coordinates
+    obj_2D = np.concatenate([obj_2D[:, 1:2], obj_2D[:, 0:1], obj_2D[:, 2:3]], axis=1).astype(np.float32)
+
+    # Normalize and scale coordinates
+    obj_2D[:, 1] = 1 - obj_2D[:, 1] / camera_matrix[1, 1]
+    obj_2D[:, 0] = obj_2D[:, 0] / camera_matrix[0, 0]
+    obj_2D[:, :2] = obj_2D[:, :2] * 2 - 1
+
+    # Transform 2D coordinates to 3D using projection matrix
+    obj_3D = np.concatenate([obj_2D[:, :2] * obj_2D[:, 2:3],
+                             obj_2D[:, 2:3],
+                             (obj_2D[:, 2:3] - 1.0 * projection_matrix[2, 3]) / projection_matrix[2, 2] * projection_matrix[3, 2]],
+                             axis=1)
+
+    # Invert projection matrix to get world coordinates
+    obj_3D = np.linalg.inv(projection_matrix) @ obj_3D.T
+
+    # Invert camera matrix to transform to world coordinates
+    obj_3D = (np.linalg.inv(camera_matrix) @ obj_3D).T
+
+    return obj_3D[:, :3]
+
+def open3d_convert_rgbd_to_pcd(pix_t_cam, img_array, dep_array):
+    """Use open3d to convert RGBD to PCD
+
+    Args:
+        pix_t_cam (np.ndarray): Intirnsics from Projection matrix 
+        img_array (np.ndarray): RGB image
+        dep_array (np.ndarray): Depth Image
+    """
+    intrinsic = o3d.camera.PinholeCameraIntrinsic(256,256,pix_t_cam[0,0],pix_t_cam[1,1],pix_t_cam[0,2],pix_t_cam[1,2])
+    img = o3d.geometry.Image(img_array.astype(np.uint8))
+    depth = o3d.geometry.Image(dep_array.astype(np.float32))
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(img, depth, convert_rgb_to_intensity=False)
+    pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsic)
+    pcd_points = np.asarray(pcd.points)
+    pcd_color = np.asarray(pcd.colors)
+    return np.concatenate([pcd_points, pcd_color], axis=1)
+
+
+def create_3d_bbox(center, length, width, height, yaw):
+    # Create a rotation matrix based on yaw angle
+    rotation_matrix = np.array([[np.cos(yaw), -np.sin(yaw), 0],
+                                [np.sin(yaw), np.cos(yaw), 0],
+                                [0, 0, 1]])
+
+    # Define the corners of the bounding box in object space
+    corners = np.array([[-length / 2, -width / 2, -height / 2],
+                        [length / 2, -width / 2, -height / 2],
+                        [length / 2, width / 2, -height / 2],
+                        [-length / 2, width / 2, -height / 2],
+                        [-length / 2, -width / 2, height / 2],
+                        [length / 2, -width / 2, height / 2],
+                        [length / 2, width / 2, height / 2],
+                        [-length / 2, width / 2, height / 2]])
+
+    # Apply rotation to the corners
+    rotated_corners = np.dot(corners, rotation_matrix.T)
+
+    # Translate the rotated corners to the specified center
+    translated_corners = rotated_corners + center
+
+    # Define the edges of the bounding box
+    edges = [[0, 1], [1, 2], [2, 3], [3, 0],
+             [4, 5], [5, 6], [6, 7], [7, 4],
+             [0, 4], [1, 5], [2, 6], [3, 7]]
+
+    # Create a line set for the bounding box
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(translated_corners)
+    line_set.lines = o3d.utility.Vector2iVector(edges)
+
+    return line_set
+
+
+
+
+
+def visualize_bbox_points(points, colors, bbox_points):
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    pcd.colors = o3d.utility.Vector3dVector(colors)
+    bbox_colors = np.array([[0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0]])
+    pcd.points.extend(o3d.utility.Vector3dVector(bbox_points))
+    pcd.colors.extend(o3d.utility.Vector3dVector(bbox_colors))
+    o3d.visualization.draw_geometries([pcd])
+
+
+
+#########################################################################################################################
+
+
+# def visualize_bbox_points_with_lines(points, colors, corner_box):
+#     pcd = o3d.geometry.PointCloud()
+#     pcd.points = o3d.utility.Vector3dVector(points)
+#     pcd.colors = o3d.utility.Vector3dVector(colors)
+
+#     # Create a LineSet for bounding box edges
+#     lines = [[0, 1], [1, 2], [2, 3], [0, 3],
+#              [4, 5], [5, 6], [6, 7], [4, 7],
+#              [0, 4], [1, 5], [2, 6], [3, 7]]
+
+#     # Use the same color for all lines
+#     line_colors = [[1, 0, 0] for _ in range(len(lines))]
+
+#     line_set = o3d.geometry.LineSet()
+#     line_set.points = o3d.utility.Vector3dVector(corner_box)
+#     line_set.lines = o3d.utility.Vector2iVector(lines)
+#     line_set.colors = o3d.utility.Vector3dVector(line_colors)
+
+#     # Create a visualization object and window
+#     vis = o3d.visualization.Visualizer()
+#     vis.create_window()
+
+#     # Display the point cloud and bounding box edges
+#     vis.add_geometry(pcd)
+#     vis.add_geometry(line_set)
+
+#     # Run the visualization loop
+#     vis.run()
+
+
+
+
+# code to convert [x,y,z,h,w,l,r] ---> bbox
+# def box_center_to_corner(box):
+#     # To return
+#     corner_boxes = np.zeros((8, 3))
+
+#     translation = box[0:3]
+#     h, w, l = box[3], box[4], box[5]
+#     rotation = box[6]
+
+#     # Create a bounding box outline
+#     bounding_box = np.array([
+#         [-l/2, -l/2, l/2, l/2, -l/2, -l/2, l/2, l/2],
+#         [w/2, -w/2, -w/2, w/2, w/2, -w/2, -w/2, w/2],
+#         [-h/2, -h/2, -h/2, -h/2, h/2, h/2, h/2, h/2]])
+
+#     # Standard 3x3 rotation matrix around the Z axis
+#     rotation_matrix = np.array([
+#         [np.cos(rotation), -np.sin(rotation), 0.0],
+#         [np.sin(rotation), np.cos(rotation), 0.0],
+#         [0.0, 0.0, 1.0]])
+
+#     # Repeat the [x, y, z] eight times
+#     eight_points = np.tile(translation, (8, 1))
+
+#     # Translate the rotated bounding box by the
+#     # original center position to obtain the final box
+#     corner_box = np.dot(
+#         rotation_matrix, bounding_box) + eight_points.transpose()
+
+#     return corner_box.transpose()
+
+def apply_transform(points, R, t, scale):
+    """
+    Apply rotation, translation, and scaling to a set of 3D points.
+
+    Args:
+    - points (numpy.ndarray): 3D points matrix, each column is a point.
+    - R (numpy.ndarray): 3x3 rotation matrix.
+    - t (numpy.ndarray): 1x3 translation vector.
+    - scale (numpy.ndarray): 1x3 scaling factors for each axis.
+
+    Returns:
+    - transformed_points (numpy.ndarray): Transformed 3D points matrix.
+    """
+    # Ensure input data is in the correct format
+    points = np.array(points)
+    R = np.array(R)
+    t = np.array(t)
+    scale = np.array(scale)
+
+    # Create a scaling matrix
+    scale_matrix = np.diag(scale)
+
+    # Apply scaling, rotation, and translation
+    transformed_points = np.dot(R, points.T).T + t
+    return transformed_points
+
+def get_rotation_matrix(x,y,z,w):
+    return np.array([
+            [1 - 2*y**2 - 2*z**2, 2*x*y - 2*w*z, 2*x*z + 2*w*y],
+            [2*x*y + 2*w*z, 1 - 2*x**2 - 2*z**2, 2*y*z - 2*w*x],
+            [2*x*z - 2*w*y, 2*y*z + 2*w*x, 1 - 2*x**2 - 2*y**2]
+        ])
 
 def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
 
@@ -103,7 +314,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     f_obj = file["frames"]
     rgb = f_obj[frame_id]["images"]["_img"][:]
     image = Image.open(io.BytesIO(rgb))
-    # image = ImageOps.mirror(image)
+    image = ImageOps.mirror(image)
     RGB_IMG_PATH = os.path.join(STORE_PATH_ROOT, "phys_trainval", "image", SPLIT) + "/" + file_frame_combined_name + ".jpg"
     image.save(RGB_IMG_PATH)
 
@@ -136,9 +347,11 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     }
 
     pcd_generator = PhysionPointCloudGenerator(hdf5_file_path=os.path.join(PHYSION_HDF5_ROOT, _file, filename), frame_number=frame_id, plot=False)
-    pcd = pcd_generator.run()
+    pcd_points = pcd_generator.run()
 
-    pcd.astype('float32').tofile(os.path.join(STORE_PATH_ROOT, pts_path))
+    pcd_points.astype('float32').tofile(os.path.join(STORE_PATH_ROOT, pts_path))
+    
+    pcd_new = open3d_convert_rgbd_to_pcd(pix_T_cam, np.array(image), pcd_generator.get_depth_values(f_obj[frame_id]["images"]["_depth"][:], width=256, height=256, near_plane=0.1, far_plane=100))
 
     bbox_list = []
     location_list = []
@@ -147,6 +360,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     heading_ang = []
     names_list = []
     index_list = []
+    bbox_points_list = []
 
     for seg_id in range(num_segments_in_img):
 
@@ -165,7 +379,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     
         seg = f_obj[frame_id]["images"]["_id"][:]
         image = Image.open(io.BytesIO(seg))
-        # image = ImageOps.mirror(image)
+        image = ImageOps.mirror(image)
         seg_numpy_arr = np.array(image)
         seg_mask = (seg_numpy_arr == seg_color).all(-1)
         seg_mask = seg_mask.astype(np.uint8)
@@ -173,15 +387,17 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
             # NOTE: Some error in data for pilot_dominoes_0mid_d3chairs_o1plants_tdwroom_0001.hdf5, final seg mask empty
             warnings.warn('Missing segmentation mask for file: ' + filename + " at frame: " + frame_id) 
             continue
-        
+        # import pdb; pdb.set_trace() 
         bbox = get_bbox_from_seg_mask(seg_mask)
         bbox_list.append(bbox)
 
         location_list.append(f_obj[frame_id]["objects"]["center"][seg_id])
-
+        center = f_obj[frame_id]["objects"]["center"][seg_id]
+        # convert_camera_to_world(np_cam, np_proj_mat, center)
+        
         front = f_obj[frame_id]["objects"]["front"][seg_id]
         back = f_obj[frame_id]["objects"]["back"][seg_id]
-        width_val = abs(front[2] - back[2])
+        width_val = abs(front[2] - back[2]) #TODO: Scale could be wrong?
 
         left = f_obj[frame_id]["objects"]["left"][seg_id]
         right = f_obj[frame_id]["objects"]["right"][seg_id]
@@ -194,10 +410,49 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         center_x = f_obj[frame_id]["objects"]["center"][seg_id][0]
         center_y = f_obj[frame_id]["objects"]["center"][seg_id][1]
         center_z = f_obj[frame_id]["objects"]["center"][seg_id][2]
+        
+        bbox_points_for_plotting = np.array([front, back, left, right, top, bottom, center])
+        # location_list.append(convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["center"][seg_id]))
+ 
+        # center = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["center"][seg_id])
+        # front = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["front"][seg_id])
+        # back = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["back"][seg_id])
+        # width_val = abs(front[:, 2] - back[:, 2])
 
+        # left = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["left"][seg_id])
+        # right = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["right"][seg_id])
+        # length_val = abs(left[:, 0] - right[:, 0])
+
+        # top = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["top"][seg_id])
+        # bottom = convert_camera_to_world(np_cam, np_proj_mat,f_obj[frame_id]["objects"]["bottom"][seg_id])
+        # height_val = abs(top[:, 1] - bottom[:, 1])
+
+        # dim = [height_val, width_val, length_val]
+        # dimensions_list.append(dim)
+
+        # center_x = center[:, 0]
+        # center_y = center[:, 1]
+        # center_z = center[:, 2]
+        #TODO: Check quartonion order
+        [x,y,z, w] = f_obj[frame_id]["objects"]["rotations"][seg_id]
+        t = f_obj[frame_id]["objects"]["positions"][seg_id]
+        scale = s_obj['scale'][seg_id]
+        # R = get_rotation_matrix(x,y,z,w)
+        
         points = [front, back, left, right, top, bottom]
         # center = [center_x, center_y, center_z]
         # plot_box(points, center)
+
+            
+        # Trying the scaled and transformed points
+        # center_new =  apply_transform(center.reshape(1,3), R, t, scale).squeeze(0)
+        # front_new =  apply_transform(front.reshape(1,3), R, t, scale).squeeze(0)
+        # back_new =  apply_transform(back.reshape(1,3), R, t, scale).squeeze(0)
+        # top_new =  apply_transform(top.reshape(1,3), R, t, scale).squeeze(0)
+        # bottom_new =  apply_transform(bottom.reshape(1,3), R, t, scale).squeeze(0)
+        # left_new =  apply_transform(left.reshape(1,3), R, t, scale).squeeze(0)
+        # right_new =  apply_transform(right.reshape(1,3), R, t, scale).squeeze(0)    
+        # points = [front_new, back_new, left_new, right_new, top_new, bottom_new]
 
         points = np.array(points)
         min_x, max_x = np.min(points[:, 0]), np.max(points[:, 0])
@@ -208,39 +463,63 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         dimensions_list.append(bbox_3d_dims)
 
 
-        #TODO: Check quartonion order
-        [w,x,y,z] = f_obj[frame_id]["objects"]["rotations"][seg_id]
+        def calculate_bounding_box_dimensions(points):
+            # Ensure points is a list of NumPy arrays
+            
+            points = [np.array(point) for point in points]
 
+            # Calculate Length
+            length = np.linalg.norm(points[0] - points[1])
+
+            # Calculate Width
+            width = np.linalg.norm(points[2] - points[3])
+
+            # Calculate Height
+            height = np.linalg.norm(points[4] - points[5])
+
+            return [length, width, height]
+        
+        bbox_3d_dims_new = calculate_bounding_box_dimensions(points)
+        
+       
         #TODO Check is rotation_y == yaw?
-        yaw = math.atan2(2.0*(y*z + w*x), w*w - x*x - y*y + z*z)
+        yaw = math.atan2(2.0*(y*z + x*y), w*w + x*x - y*y - z*z)
         heading_ang.append(yaw)
 
         #TODO Check (x, y, z, x_size, y_size, z_size, yaw) x_size, y_size, z_size ordering
-        gt_boxes_upright_depth = [center_x, center_y, center_z, bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2], yaw]
+        # gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2], yaw]
+        # gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2], x, y, z, w, t[0], t[1], t[2]]
+        gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims_new[1], bbox_3d_dims_new[2], bbox_3d_dims_new[0], x, y, z, w]
+        # gt_boxes_upright_depth = [center_x , center_y, center_z, length_val.item(), height_val.item(), width_val.item(), x, y, z, w, t[0], t[1], t[2]]
+        bbox_points = [center, front, back, left, right, top, bottom]
+        # gt_boxes_upright_depth = [center_x , center_y, center_z, length_val, height_val, width_val, x, y, z, w, t[0], t[1], t[2]]
+        # gt_boxes_upright_depth = [center_new[0], center_new[1], center_new[2], bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2], yaw]
         # gt_boxes_upright_depth = [center_x, center_y, center_z, length_val, height_val, width_val, yaw]
         gt_boxes_upright_depth_list.append(gt_boxes_upright_depth)
+        bbox_points_list.append(bbox_points)
         names_list.append(obj_name.decode('utf-8'))
         index_list.append(CRUCIAL_OBJECTS_CLASS[obj_name])
 
-    
-        
-    # # Visualize point cloud
-    # vis = Visualizer(pcd, bbox3d=np.asarray(gt_boxes_upright_depth_list), mode="xyzrgb")
+    visualizer = PointCloudVisualizer()
+    visualizer.visualize_point_cloud_and_bboxes(pcd_points, gt_boxes_upright_depth_list)
+    # visualize_point_cloud_and_bboxes(pcd_points , gt_boxes_upright_depth_list, bbox_points_list)
+    # Visualize point cloud
+    # vis = Visualizer(pcd_points, bbox3d=np.asarray(gt_boxes_upright_depth_list), mode="xyzrgb", center_mode="lidar_bottom")
     # vis.show()
 
     
     num_segments_in_img = len(gt_boxes_upright_depth_list)
     annos = {
         'gt_num': num_segments_in_img,
-        'name': np.asarray(names_list),
+        # 'name': np.asarray(names_list),
+        'name': np.asarray(['object' for i in range(num_segments_in_img)]),
         'bbox': np.asarray(bbox_list),
         'location': np.asarray(location_list),
         'dimensions': np.asarray(dimensions_list),
-        # TODO Verify rotation_y is one angle per object? [1 x num_objs]?
         'rotation_y': np.asarray(heading_ang),
         'index': np.asarray([i for i in range(num_segments_in_img)]),
-        # 'class': np.asarray([0 for _ in range(num_segments_in_img)], dtype=np.int32),
-        'class': np.asarray(index_list),
+        'class': np.asarray([0 for _ in range(num_segments_in_img)], dtype=np.int32),
+        # 'class': np.asarray(index_list),
         'gt_boxes_upright_depth': np.asarray(gt_boxes_upright_depth_list)
     }
 
@@ -254,36 +533,39 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         'annos': annos
     }
     
-    # TODO: Verify depth coordinates
+  
 
 if __name__ == "__main__":
     
     args = parse_args()
     SPLIT = args.split
-    PHYSION_HDF5_ROOT = "/tr3d_data/physion/HDF5/" + f"{SPLIT}"
-    PREV_PKL_FILE_PATH = "/tr3d_data/physion" + f"/{SPLIT}.pkl"
-    OBJ_TYPE_LIST_PATH = "/r3d_data/physion" + f"/{SPLIT}.txt"
+    PHYSION_HDF5_ROOT = "/home/kalyanav/MS_thesis/tr3d_data/physion/HDF5/" + f"{SPLIT}"
+    PREV_PKL_FILE_PATH = "/home/kalyanav/MS_thesis/tr3d_data/physion" + f"/{SPLIT}.pkl"
+    OBJ_TYPE_LIST_PATH = "/home/kalyanav/MS_thesis/r3d_data/physion" + f"/{SPLIT}.txt"
 
-    STORE_PATH_ROOT = "/tr3d_data/physion"
+    # PHYSION_RGB_PATH = "/home/kashis/Desktop/Eval7/tr3d/physion"
+
+    STORE_PATH_ROOT = "/home/kalyanav/MS_thesis/tr3d_data/physion"
     data_infos = []
     img_idx = 0
     start = 50
     frames_per_vid = 20
     for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
-        for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
-            if os.path.join(PHYSION_HDF5_ROOT, _file, filename).endswith('hdf5'):
-                vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, _file, filename) 
-                print("Looking at : ", os.path.join(_file, filename))
-                try:
-                    with h5py.File(vid_hdf5_path, 'r') as file:
-                        for frame_id in list(file["frames"].keys())[start : start + frames_per_vid]:
-                            phys_dict = get_phys_dict(img_idx, _file, _file_idx, filename, frame_id)
-                            print(filename, frame_id)
-                            print("img_idx: ",img_idx)
-                            img_idx += 1
-                            data_infos.append(phys_dict)
-                except OSError:
-                    continue
+        if 'dominoes' in _file or 'collision' in _file:
+            for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
+                if os.path.join(PHYSION_HDF5_ROOT, _file, filename).endswith('hdf5'):
+                    vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, _file, filename) 
+                    print("Looking at : ", os.path.join(_file, filename))
+                    try:
+                        with h5py.File(vid_hdf5_path, 'r') as file:
+                            for frame_id in list(file["frames"].keys())[start : start + frames_per_vid]:
+                                phys_dict = get_phys_dict(img_idx, _file, _file_idx, filename, frame_id)
+                                print(filename, frame_id)
+                                print("img_idx: ",img_idx)
+                                img_idx += 1
+                                data_infos.append(phys_dict)
+                    except OSError:
+                        continue
     print("Storing {} pickle file ....".format(SPLIT) )
     with open(PREV_PKL_FILE_PATH, "wb") as pickle_file:
         pickle.dump(data_infos, pickle_file)
