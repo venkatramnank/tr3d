@@ -14,9 +14,9 @@ from .pipelines import Compose
 
 
 @DATASETS.register_module()
-class SUNRGBDDataset(Custom3DDataset):
-    r"""SUNRGBD Dataset.
-
+class PhysionDataset(Custom3DDataset):
+    r"""Physion Dataset.
+    TODO: NEED TO UPDATE!!
     This class serves as the API for experiments on the SUNRGBD Dataset.
 
     See the `download page <http://rgbd.cs.princeton.edu/challenge.html>`_
@@ -44,8 +44,7 @@ class SUNRGBDDataset(Custom3DDataset):
         test_mode (bool, optional): Whether the dataset is in test mode.
             Defaults to False.
     """
-    CLASSES = ('bed', 'table', 'sofa', 'chair', 'toilet', 'desk', 'dresser',
-               'night_stand', 'bookshelf', 'bathtub')
+    CLASSES = ('object')
 
     def __init__(self,
                  data_root,
@@ -53,7 +52,7 @@ class SUNRGBDDataset(Custom3DDataset):
                  pipeline=None,
                  classes=None,
                  modality=dict(use_camera=True, use_lidar=True),
-                 box_type_3d='Depth',
+                 box_type_3d='Physion',
                  filter_empty_gt=True,
                  test_mode=False,
                  **kwargs):
@@ -147,14 +146,12 @@ class SUNRGBDDataset(Custom3DDataset):
             
         ######################################################################################################################################################   
         #Testing the new physion box structure
-
-        # gt_bboxes_3d = Physion3DBoxes(gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
-        import pdb; pdb.set_trace()
+        gt_bboxes_3d = Physion3DBoxes(gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
         ###################################################################################################################################################### 
         
         # to target box structure
-        gt_bboxes_3d = DepthInstance3DBoxes(
-            gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
+        # gt_bboxes_3d = DepthInstance3DBoxes(
+        #     gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
         
         
         

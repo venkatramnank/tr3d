@@ -2,7 +2,7 @@
 import numpy as np
 from mmcv.parallel import DataContainer as DC
 
-from mmdet3d.core.bbox import BaseInstance3DBoxes
+from mmdet3d.core.bbox import BaseInstance3DBoxes, Physion3DBoxes
 from mmdet3d.core.points import BasePoints
 from mmdet.datasets.pipelines import to_tensor
 from ..builder import PIPELINES
@@ -59,14 +59,18 @@ class DefaultFormatBundle(object):
                 results[key] = DC([to_tensor(res) for res in results[key]])
             else:
                 results[key] = DC(to_tensor(results[key]))
+        
         if 'gt_bboxes_3d' in results:
             if isinstance(results['gt_bboxes_3d'], BaseInstance3DBoxes):
+                results['gt_bboxes_3d'] = DC(
+                    results['gt_bboxes_3d'], cpu_only=True)
+            elif isinstance(results['gt_bboxes_3d'], Physion3DBoxes):
                 results['gt_bboxes_3d'] = DC(
                     results['gt_bboxes_3d'], cpu_only=True)
             else:
                 results['gt_bboxes_3d'] = DC(
                     to_tensor(results['gt_bboxes_3d']))
-
+        
         if 'gt_masks' in results:
             results['gt_masks'] = DC(results['gt_masks'], cpu_only=True)
         if 'gt_semantic_seg' in results:

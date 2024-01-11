@@ -44,7 +44,7 @@ load_from = None
 resume_from = None
 workflow = [('train', 1)]
 
-dataset_type = 'SUNRGBDDataset'
+dataset_type = 'PhysionDataset'
 data_root = '/home/kalyanav/MS_thesis/tr3d_data/physion/'
 # class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
@@ -58,17 +58,17 @@ train_pipeline = [
         use_dim=[0, 1, 2, 3, 4, 5]),
     dict(type='LoadAnnotations3D'),
     dict(type='PointSample', num_points=n_points),
-    dict(
-        type='RandomFlip3D',
-        sync_2d=False,
-        flip_ratio_bev_horizontal=.5,
-        flip_ratio_bev_vertical=.0),
-    dict(
-        type='GlobalRotScaleTrans',
-        rot_range=[-.523599, .523599],
-        scale_ratio_range=[.85, 1.15],
-        translation_std=[.1, .1, .1],
-        shift_height=False),
+    # dict(
+    #     type='RandomFlip3D',
+    #     sync_2d=False,
+    #     flip_ratio_bev_horizontal=.5,
+    #     flip_ratio_bev_vertical=.0),
+    # dict(
+    #     type='GlobalRotScaleTrans',
+    #     rot_range=[-.523599, .523599],
+    #     scale_ratio_range=[.85, 1.15],
+    #     translation_std=[.1, .1, .1],
+    #     shift_height=False),
     # dict(type='NormalizePointsColor', color_mean=None),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
@@ -98,7 +98,7 @@ test_pipeline = [
 ]
 data = dict(
     samples_per_gpu=16,
-    workers_per_gpu=1,
+    workers_per_gpu=0,
     train=dict(
         type='RepeatDataset',
         times=5,
@@ -110,7 +110,7 @@ data = dict(
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
-            box_type_3d='Depth')),
+            box_type_3d='Physion')),
     val=dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
@@ -119,7 +119,7 @@ data = dict(
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
-        box_type_3d='Depth'),
+        box_type_3d='Physion'),
     test=dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
@@ -128,4 +128,4 @@ data = dict(
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
-        box_type_3d='Depth'))
+        box_type_3d='Physion'))

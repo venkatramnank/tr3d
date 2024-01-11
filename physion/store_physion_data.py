@@ -431,7 +431,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
             return [length, width, height]
         
         bbox_3d_dims = calculate_bounding_box_dimensions(points)
-        dimensions_list.append(bbox_3d_dims)
+        dimensions_list.append([bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[2]])
 
         yaw = math.atan2(2.0*(y*z + x*y), w*w + x*x - y*y - z*z)
         heading_ang.append(yaw)
@@ -445,12 +445,8 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         names_list.append(obj_name.decode('utf-8'))
         index_list.append(CRUCIAL_OBJECTS_CLASS[obj_name])
 
-    visualizer = PointCloudVisualizer()
-    visualizer.visualize_point_cloud_and_bboxes(pcd_points, gt_boxes_upright_depth_list)
-    # visualize_point_cloud_and_bboxes(pcd_points , gt_boxes_upright_depth_list, bbox_points_list)
-    # Visualize point cloud
-    # vis = Visualizer(pcd_points, bbox3d=np.asarray(gt_boxes_upright_depth_list), mode="xyzrgb", center_mode="lidar_bottom")
-    # vis.show()
+    # visualizer = PointCloudVisualizer()
+    # visualizer.visualize_point_cloud_and_bboxes(pcd_points, gt_boxes_upright_depth_list)
 
     
     num_segments_in_img = len(gt_boxes_upright_depth_list)

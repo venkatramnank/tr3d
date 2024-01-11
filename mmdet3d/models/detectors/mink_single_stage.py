@@ -12,6 +12,7 @@ from mmdet3d.models import DETECTORS, build_backbone, build_head, build_neck
 from .base import Base3DDetector
 from tools.data_converter.voxelize_mlpointconvformer import *
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
+from physion.physion_tools import PointCloudVisualizer
 
 
 @DETECTORS.register_module()
@@ -67,6 +68,8 @@ class MinkSingleStage3DDetector(Base3DDetector):
         
         points = [p[voxelize(p[:, :3], self.voxel_size)] for p in points]  # [65536 x 6] [] [] ... b #TODO: visualize it once
         # import pdb; pdb.set_trace()
+        # visualizer = PointCloudVisualizer()
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes[0].tensor.cpu().numpy())
         # coordinates, features = ME.utils.batch_sparse_collate(
         #     [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
         #     device=points[0].device) 
@@ -97,8 +100,8 @@ class MinkSingleStage3DDetector(Base3DDetector):
         import pdb; pdb.set_trace()
         ######################################################################################
         # visualizing the points and gt_bboxes_3d to make sure it is alright
-        vis = Visualizer(points, bbox3d=np.asarray(gt_bboxes_3d), mode="xyzrgb", center_mode="physion", rot_axis=1)
-        vis.show()
+        # visualizer = PointCloudVisualizer()
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].tensor.cpu().numpy())
         #####################################################################################
         x = self.extract_feats(points)
         # import pdb; pdb.set_trace()
