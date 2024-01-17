@@ -97,7 +97,7 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             dict: Centerness, bbox and classification loss values.
         """
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         ######################################################################################
         # visualizing the points and gt_bboxes_3d to make sure it is alright
         # visualizer = PointCloudVisualizer()

@@ -405,6 +405,7 @@ class TR3DHead(BaseModule):
 
         reg_final = self.bbox_conv(x).features
         reg_distance = torch.exp(reg_final[:, 3:6])
+        import pdb; pdb.set_trace()
         #TODO: Need to fix this for accepting quartenions
         # reg_angle = reg_final[:, 6:]
         reg_angle = torch.zeros_like(reg_final[:, 6:])

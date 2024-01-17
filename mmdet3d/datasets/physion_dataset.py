@@ -148,13 +148,10 @@ class PhysionDataset(Custom3DDataset):
         #Testing the new physion box structure
         gt_bboxes_3d = Physion3DBoxes(gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
         ###################################################################################################################################################### 
-        
+      
         # to target box structure
         # gt_bboxes_3d = DepthInstance3DBoxes(
         #     gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
-        
-        
-        
 
         anns_results = dict(
             gt_bboxes_3d=gt_bboxes_3d, gt_labels_3d=gt_labels_3d)
@@ -187,6 +184,7 @@ class PhysionDataset(Custom3DDataset):
         if self.modality['use_camera']:
             pipeline.insert(0, dict(type='LoadImageFromFile'))
         return Compose(pipeline)
+
 
     def show(self, results, out_dir, show=True, pipeline=None):
         """Results visualization.

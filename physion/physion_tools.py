@@ -10,6 +10,8 @@ import os
 import open3d as o3d
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
+from .external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np
+
 
 
 class PhysionPointCloudGenerator:
@@ -372,7 +374,7 @@ class PointCloudVisualizer:
         pcd.colors = o3d.utility.Vector3dVector(color)
         return pcd
 
-    def create_3d_bbox(self, center, dimensions, rotation_matrix, bbox_points=None, use_rot=False, use_points=False):
+    def create_3d_bbox(self, center, dimensions, rotation_matrix=None, bbox_points=None, use_rot=False, use_points=False):
         if use_rot:
             bbox = o3d.geometry.OrientedBoundingBox(center=center, R=rotation_matrix, extent=dimensions)
             bbox.color = (0,1,0)
@@ -393,20 +395,39 @@ class PointCloudVisualizer:
             #     bbox_colors = np.array([[0.0, 1.0, 0.0]] * 7)
             #     pcd.points.extend(o3d.utility.Vector3dVector(bbox_points))
             #     pcd.colors.extend(o3d.utility.Vector3dVector(bbox_colors))
-            center, dimensions, quartenion = (
-                gt_bbox_info[:3],
-                gt_bbox_info[3:6],
-                gt_bbox_info[6:10]
-            )
-            rot = R.from_quat([quartenion[0], quartenion[1], quartenion[2], quartenion[3]])
-            bbox = self.create_3d_bbox(
-                np.array(center).reshape(3, 1),
-                np.array(dimensions).reshape(3, 1),
-                rot.as_matrix(),
-                use_rot=True,
-                use_points=False,
-            )
-            
+            if len(gt_bbox_info) == 10:
+                center, dimensions, quartenion = (
+                    gt_bbox_info[:3],
+                    gt_bbox_info[3:6],
+                    gt_bbox_info[6:10]
+                )
+                dimensions = (np.array(dimensions).transpose(1,2,0)).tolist()
+                rot = R.from_quat([quartenion[0], quartenion[1], quartenion[2], quartenion[3]])
+                bbox = self.create_3d_bbox(
+                    np.array(center).reshape(3, 1),
+                    np.array(dimensions).reshape(3, 1),
+                    rot.as_matrix(),
+                    use_rot=True,
+                    use_points=False,
+                )
+            elif len(gt_bbox_info) == 12:
+                center, dimensions, ortho6d = (
+                    gt_bbox_info[:3],
+                    gt_bbox_info[3:6],
+                    gt_bbox_info[6:]
+                )
+                dimensions = (np.array(dimensions)[[1,2,0]]).tolist()
+                rot = compute_rotation_matrix_from_ortho6d_np(np.array(ortho6d).reshape(1, 6)).squeeze(0)
+                bbox = self.create_3d_bbox(
+                    np.array(center).reshape(3, 1),
+                    np.array(dimensions).reshape(3, 1),
+                    rotation_matrix=rot,
+                    use_rot=True,
+                    use_points=False,
+                )    
+            else:
+                print("Error in dimension of input, unable to visualize")
+                exit()
             self.vis.add_geometry(bbox)
 
         self.vis.get_view_control().set_front([0, 0, -1])
@@ -415,3 +436,5 @@ class PointCloudVisualizer:
 
         self.vis.run()
         self.vis.destroy_window()
+
+

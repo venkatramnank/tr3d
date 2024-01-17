@@ -7,10 +7,10 @@ from abc import abstractmethod
 from mmdet3d.core.points import BasePoints
 from .base_box3d import BaseInstance3DBoxes
 from .utils import rotation_3d_in_axis
-from scipy.spatial.transform import Rotation
+from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
 
 class Physion3DBoxes(object):
-    def __init__(self, tensor, box_dim = 10, with_quaternion=True, origin=(0.5, 0.5, 0)):
+    def __init__(self, tensor, box_dim = 12, with_ortho6d=True, origin=(0.5, 0.5, 0)):
 
         # modified_box_dim = box_dim 
         # super().__init__(tensor, box_dim=modified_box_dim, with_yaw=False, origin=origin)
@@ -32,20 +32,15 @@ class Physion3DBoxes(object):
         #     src = self.tensor.new_tensor(origin)
         #     self.tensor[:, :3] += self.tensor[:, 3:6] * (dst - src)
 
-        self.with_quaternion = with_quaternion
+        self.with_ortho6d = with_ortho6d
+        self.rotation_matrix = compute_rotation_matrix_from_ortho6d(tensor[:, 6:])
         
-        #euler angle preperation
-        # quaternion = self.tensor[:, 6:].numpy()
-        # rotation = Rotation.from_quat(quaternion)
-        # euler_angles_np = rotation.as_euler('xyz')
-        # self.euler_angles = torch.tensor(euler_angles_np)
-        # self.rotation_matrix = torch.tensor(rotation.as_matrix(), dtype=torch.float64)
 
     @property
-    def quaternion(self):
+    def orth6d(self):
         """
-        [x,y,z,w]
-        torch.Tensor: Size dimensions of each box in shape (N, 4).
+        ortho6d representation
+        torch.Tensor: Size dimensions of each box in shape (N, 6).
         """
         return self.tensor[:, 6:]
 
@@ -110,8 +105,9 @@ class Physion3DBoxes(object):
         # # rotate around z axis
         # corners = rotation_3d_in_axis(
         #     corners, self.tensor[:, 6], axis=self.YAW_AXIS)
+        # corners = corners.permute(0, 2, 1)
 
-        corners = torch.matmul(self.rotation_matrix, corners.permute(0,2,1))
+        corners = corners@self.rotation_matrix
         corners += self.tensor[:, :3].view(-1, 1, 3)
         return corners
     

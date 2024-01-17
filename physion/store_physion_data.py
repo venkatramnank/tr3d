@@ -19,6 +19,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import argparse
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
+from external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np
 
 global_object_types = set()
 CRUCIAL_OBJECTS = [b'cloth_square', b'buddah', b'bowl', b'cone', b'cube', b'cylinder', b'dumbbell', b'octahedron', b'pentagon', b'pipe', b'platonic', b'pyramid', b'sphere', b'torus', b'triangular_prism']
@@ -307,6 +308,13 @@ def get_rotation_matrix(x,y,z,w):
             [2*x*z - 2*w*y, 2*y*z + 2*w*x, 1 - 2*x**2 - 2*y**2]
         ])
 
+
+def get_rotation_matrix_from_quaternion(x,y,z,w):
+    rot = R.from_quat([x,y,z,w])
+    return (rot.as_matrix())
+    
+
+
 def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
 
     file_frame_combined_name = filename.split(".hdf5")[0] + "_" + str(_file_idx) + "_" + frame_id
@@ -416,8 +424,9 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         [x,y,z, w] = f_obj[frame_id]["objects"]["rotations"][seg_id]
         t = f_obj[frame_id]["objects"]["positions"][seg_id]
         scale = s_obj['scale'][seg_id]
-        # R = get_rotation_matrix(x,y,z,w)
-        
+        R = get_rotation_matrix_from_quaternion(x,y,z,w)
+        ortho6d = get_ortho6d_from_R(R)
+        R_from_ortho = compute_rotation_matrix_from_ortho6d_np(ortho6d.reshape(1, 6)).squeeze(0)
         points = [front, back, left, right, top, bottom]
         points = np.array(points)
 
@@ -436,8 +445,8 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         yaw = math.atan2(2.0*(y*z + x*y), w*w + x*x - y*y - z*z)
         heading_ang.append(yaw)
 
-
-        gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0], x, y, z, w]
+        # [x, y, z, w, h, l, 6d representation of R]
+        gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2]] + ortho6d.tolist()
         bbox_points = [center, front, back, left, right, top, bottom]
 
         gt_boxes_upright_depth_list.append(gt_boxes_upright_depth)
