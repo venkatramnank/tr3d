@@ -10,7 +10,7 @@ import os
 import open3d as o3d
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
-from .external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np
+from physion.external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np
 
 
 
@@ -368,10 +368,25 @@ class PointCloudVisualizer:
         self.vis = o3d.visualization.Visualizer()
         self.vis.create_window()
 
-    def create_point_cloud(self, points, color):
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(points)
-        pcd.colors = o3d.utility.Vector3dVector(color)
+    def create_point_cloud(self, points, color, corners=None, center = None):
+        if corners is not None and center is not None:
+            print("corners included")
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points)
+            pcd.colors = o3d.utility.Vector3dVector(color)
+            bbox_colors = np.array([[1.0, 0.0, 0.0]] * corners.shape[0])
+            center_color = np.array([[1.0, 0.0, 0.0]]* center.shape[0])
+            corner_points = o3d.utility.Vector3dVector(corners)
+            corner_colors = o3d.utility.Vector3dVector(bbox_colors)
+            print(center)
+            pcd.points.extend(corner_points)
+            pcd.colors.extend(corner_colors)
+            pcd.points.extend(o3d.utility.Vector3dVector(center))
+            pcd.colors.extend(o3d.utility.Vector3dVector(center_color))
+        else:
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points)
+            pcd.colors = o3d.utility.Vector3dVector(color)
         return pcd
 
     def create_3d_bbox(self, center, dimensions, rotation_matrix=None, bbox_points=None, use_rot=False, use_points=False):
@@ -386,8 +401,8 @@ class PointCloudVisualizer:
             bbox = o3d.geometry.OrientedBoundingBox.create_from_points(bbox_points_vector)
         return bbox
 
-    def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, bbox_points_list=None):
-        pcd = self.create_point_cloud(points[:, :3], points[:, 3:])
+    def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, center = None, corners=None, bbox_points_list=None):
+        pcd = self.create_point_cloud(points[:, :3], color = points[:, 3:], corners = corners, center = center)
         self.vis.add_geometry(pcd)
 
         for gt_bbox_info in (gt_bboxes_list):
@@ -410,13 +425,15 @@ class PointCloudVisualizer:
                     use_rot=True,
                     use_points=False,
                 )
+            #using the ortho6D representation
             elif len(gt_bbox_info) == 12:
                 center, dimensions, ortho6d = (
                     gt_bbox_info[:3],
                     gt_bbox_info[3:6],
                     gt_bbox_info[6:]
                 )
-                dimensions = (np.array(dimensions)[[1,2,0]]).tolist()
+                # dimensions = (np.array(dimensions)[[1,2,0]]).tolist()
+                dimensions = (np.array(dimensions)).tolist()
                 rot = compute_rotation_matrix_from_ortho6d_np(np.array(ortho6d).reshape(1, 6)).squeeze(0)
                 bbox = self.create_3d_bbox(
                     np.array(center).reshape(3, 1),
@@ -424,6 +441,7 @@ class PointCloudVisualizer:
                     rotation_matrix=rot,
                     use_rot=True,
                     use_points=False,
+                    
                 )    
             else:
                 print("Error in dimension of input, unable to visualize")

@@ -34,8 +34,27 @@ class Physion3DBoxes(object):
 
         self.with_ortho6d = with_ortho6d
         self.rotation_matrix = compute_rotation_matrix_from_ortho6d(tensor[:, 6:])
-        
+        # import pdb; pdb.set_trace() 
+        # dims = self.tensor[:, 3:6]
+        # # dims[[0,1,2]] = dims[[1,2,0]]
+        # corners_norm = torch.from_numpy(
+        #     np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)).to(
+        #         device=dims.device, dtype=dims.dtype)
 
+        # corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
+        # # print(corners_norm)
+        # # use relative origin (0.5, 0.5, 0)
+        # # corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0])
+        # corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
+
+        # # # rotate around z axis
+        # # corners = rotation_3d_in_axis(
+        # #     corners, self.tensor[:, 6], axis=self.YAW_AXIS)
+        # # corners = corners.permute(0, 2, 1)
+        # # print(corners == corners@self.rotation_matrix)
+        # corners = self.rotation_matrix@corners.transpose(1,2)
+        # corners = corners.permute(0,2,1) 
+        # corners += self.tensor[:, :3].view(-1, 1, 3)
     @property
     def orth6d(self):
         """
@@ -66,6 +85,8 @@ class Physion3DBoxes(object):
         gravity_center[:, 2] = bottom_center[:, 2] + self.tensor[:, 5] * 0.5
         return gravity_center
     
+    
+    
     @property 
     def corners(self):
         """torch.Tensor: Coordinates of corners of all the boxes
@@ -91,25 +112,22 @@ class Physion3DBoxes(object):
         """
         if self.tensor.numel() == 0:
             return torch.empty([0, 8, 3], device=self.tensor.device)
-
-        dims = self.dims
+        dims = self.tensor[:, 3:6]
         corners_norm = torch.from_numpy(
             np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)).to(
                 device=dims.device, dtype=dims.dtype)
 
         corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
-        # use relative origin (0.5, 0.5, 0)
-        corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0])
+
+        # use relative origin (0.5, 0.5, 0.5)
+        corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0.5])
         corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
 
-        # # rotate around z axis
-        # corners = rotation_3d_in_axis(
-        #     corners, self.tensor[:, 6], axis=self.YAW_AXIS)
-        # corners = corners.permute(0, 2, 1)
-
-        corners = corners@self.rotation_matrix
+        corners = self.rotation_matrix@corners.transpose(1,2)
+        corners = corners.permute(0,2,1) 
         corners += self.tensor[:, :3].view(-1, 1, 3)
         return corners
+    
     
     
     @property
@@ -154,7 +172,7 @@ class Physion3DBoxes(object):
     @property
     def height(self):
         """torch.Tensor: A vector with height of each box in shape (N, )."""
-        return self.tensor[:, 5]
+        return self.tensor[:, 4]
 
     @property
     def top_height(self):

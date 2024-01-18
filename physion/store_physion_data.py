@@ -19,7 +19,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import argparse
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
-from external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np
+from physion.external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np
 
 global_object_types = set()
 CRUCIAL_OBJECTS = [b'cloth_square', b'buddah', b'bowl', b'cone', b'cube', b'cylinder', b'dumbbell', b'octahedron', b'pentagon', b'pipe', b'platonic', b'pyramid', b'sphere', b'torus', b'triangular_prism']
@@ -446,7 +446,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         heading_ang.append(yaw)
 
         # [x, y, z, w, h, l, 6d representation of R]
-        gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[0], bbox_3d_dims[1], bbox_3d_dims[2]] + ortho6d.tolist()
+        gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
         bbox_points = [center, front, back, left, right, top, bottom]
 
         gt_boxes_upright_depth_list.append(gt_boxes_upright_depth)
