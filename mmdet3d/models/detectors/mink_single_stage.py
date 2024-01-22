@@ -12,7 +12,7 @@ from mmdet3d.models import DETECTORS, build_backbone, build_head, build_neck
 from .base import Base3DDetector
 from tools.data_converter.voxelize_mlpointconvformer import *
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
-from physion.physion_tools import PointCloudVisualizer
+from physion.physion_tools import PointCloudVisualizer, convert_to_world_coords
 
 
 @DETECTORS.register_module()
@@ -97,11 +97,11 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             dict: Centerness, bbox and classification loss values.
         """
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         ######################################################################################
         # visualizing the points and gt_bboxes_3d to make sure it is alright
-        visualizer = PointCloudVisualizer()
-        visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].tensor.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), center=gt_bboxes_3d[0].tensor[:,:3].cpu().numpy())
+        # visualizer = PointCloudVisualizer()
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), convert_to_world_coords(gt_bboxes_3d[0].tensor.cpu().numpy()), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True)
         #####################################################################################
         x = self.extract_feats(points)
         # import pdb; pdb.set_trace()

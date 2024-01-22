@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import math
 from mpl_toolkits.mplot3d import Axes3D
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
-from physion_tools import PhysionPointCloudGenerator, PointCloudVisualizer
+from physion_tools import PhysionPointCloudGenerator, PointCloudVisualizer, canonical_to_world_np, world_to_canonical_np
 import matplotlib.pyplot as plt, numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -369,6 +369,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
     names_list = []
     index_list = []
     bbox_points_list = []
+    gt_boxes_world_coords = []
 
     for seg_id in range(num_segments_in_img):
 
@@ -405,7 +406,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         
         front = f_obj[frame_id]["objects"]["front"][seg_id]
         back = f_obj[frame_id]["objects"]["back"][seg_id]
-        width_val = abs(front[2] - back[2]) #TODO: Scale could be wrong?
+        width_val = abs(front[2] - back[2])
 
         left = f_obj[frame_id]["objects"]["left"][seg_id]
         right = f_obj[frame_id]["objects"]["right"][seg_id]
@@ -438,24 +439,48 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
             height = np.linalg.norm(points[4] - points[5])
 
             return [length, width, height]
-        
+
         bbox_3d_dims = calculate_bounding_box_dimensions(points)
         dimensions_list.append([bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[2]])
 
         yaw = math.atan2(2.0*(y*z + x*y), w*w + x*x - y*y - z*z)
         heading_ang.append(yaw)
-
         # [x, y, z, w, h, l, 6d representation of R]
-        gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
-        bbox_points = [center, front, back, left, right, top, bottom]
-
+        #TODO: need to change to scale and rotation
+        # gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
+        #  SCALE : [w,h,l] / [x,z,y]
+        gt_boxes_upright_depth = [t[0], t[1], t[2], scale[0], scale[1], scale[2]] + ortho6d.tolist()
+        # gt_boxes_upright_depth = [center, front, back, left, right, top, bottom]
+        bbox_points = [center, front, top, back, bottom, left, right]
+ 
+       
         gt_boxes_upright_depth_list.append(gt_boxes_upright_depth)
         bbox_points_list.append(bbox_points)
         names_list.append(obj_name.decode('utf-8'))
         index_list.append(CRUCIAL_OBJECTS_CLASS[obj_name])
 
+    """ 
+    center = [0, 0.5, 0]
+    front = [0, 0.5, 0.5]
+    top = [0, 1, 0]
+    back = [0, 0.5, -0.5]
+    bottom = [0,0,0]
+    left = [-0.5, 0.5, 0]
+    right = [0.5, 0.5, 0]
+    """
+    
+    canonical_values = {"center":[0, 0.5, 0],
+                        "front":[0, 0.5, 0.5],
+                        "top":[0, 1, 0],
+                        "back":[0, 0.5, -0.5],
+                        "bottom":[0,0,0],
+                        "left":[-0.5, 0.5, 0],
+                        "right":[0.5, 0.5, 0]}
+    
+
+
     # visualizer = PointCloudVisualizer()
-    # visualizer.visualize_point_cloud_and_bboxes(pcd_points, gt_boxes_upright_depth_list)
+    # visualizer.visualize_point_cloud_and_bboxes(pcd_points, gt_world_coords, use_points=True)
 
     
     num_segments_in_img = len(gt_boxes_upright_depth_list)

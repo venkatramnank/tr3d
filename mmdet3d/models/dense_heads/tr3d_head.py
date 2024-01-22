@@ -14,6 +14,7 @@ import numpy as np
 from mmdet3d.models.builder import HEADS, build_loss
 from mmdet.core.bbox.builder import BBOX_ASSIGNERS, build_assigner
 from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
+from physion.physion_nms import iou
 
 @HEADS.register_module()
 class TR3DHead(BaseModule):
@@ -94,15 +95,32 @@ class TR3DHead(BaseModule):
             return torch.empty([0, 8, 3], device=bbox.device)
         
         dims = bbox[:, 3:6]
-        corners_norm = torch.from_numpy(
-            np.stack(np.unravel_index(np.arange(8), [2]*3), axis=1)
-        ).to(device=dims.device, dtype=dims.device)
-        
-        corners_norm = corners_norm[[0,1,3,2,4,5,7,6]]
+        corners_norm = torch.stack([
+            torch.Tensor([-0.5, 0, -0.5]),
+            torch.Tensor([-0.5, 1, -0.5]),
+            torch.Tensor([-0.5, 0, 0.5]),
+            torch.Tensor([-0.5, 1, 0.5]),
+            torch.Tensor([0.5, 0, 0.5]),
+            torch.Tensor([0.5, 1, 0.5]),
+            torch.Tensor([0.5, 0, -0.5]),
+            torch.Tensor([0.5, 1, -0.5])            
+        ]).to(device=dims.device, dtype=dims.dtype)
+       
         corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
         rotation_matrix = compute_rotation_matrix_from_ortho6d(bbox[:, 6:])
-        corners = corners@rotation_matrix
+        corners = rotation_matrix@corners.transpose(1,2)
+        corners = corners.permute(0,2,1) 
         corners += bbox[:, :3].view(-1, 1, 3)
+        """
+        #NOTE: Enable gradient tracking
+        corners.requires_grad_(True)
+
+        def hook_fn(grad):
+            print('Gradients passing through _bbox_to_corners:', grad)
+
+        # Register the hook to the tensor
+        corners.register_hook(hook_fn)
+        """
         return corners
     
     @staticmethod
@@ -195,12 +213,16 @@ class TR3DHead(BaseModule):
             pos_bbox_targets = bbox_targets.to(points.device)[assigned_ids][pos_mask]
             if pos_bbox_preds.shape[1] == 6:
                 pos_bbox_targets = pos_bbox_targets[:, :6]
-            import pdb; pdb.set_trace()
-            #TODO: need to change accordingly to corners and MSE
+            # bbox_loss = self.bbox_loss(
+            #     self._bbox_to_loss(
+            #         self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
+            #     self._bbox_to_loss(pos_bbox_targets)) 
             bbox_loss = self.bbox_loss(
-                self._bbox_to_loss(
-                    self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
-                self._bbox_to_loss(pos_bbox_targets))            
+                self._bbox_to_corners(pos_bbox_preds),
+                self._bbox_to_corners(pos_bbox_targets)
+            )
+            iou(self._bbox_to_corners(pos_bbox_preds),
+                self._bbox_to_corners(pos_bbox_targets))           
         else:
             bbox_loss = None
         return bbox_loss, cls_loss, pos_mask
@@ -303,8 +325,10 @@ class TR3DHead(BaseModule):
             scores = scores[ids]
             points = points[ids]
 
-        boxes = self._bbox_pred_to_bbox(points, bbox_preds)
-        # import pdb; pdb.set_trace()
+        # boxes = self._bbox_pred_to_bbox(points, bbox_preds)
+        boxes_corners = self._bbox_to_corners(bbox_preds)
+        
+        #TODO: Need to fix NMS for 3d
         boxes, scores, labels = self._nms(boxes, scores, img_meta)
         return boxes, scores, labels
 

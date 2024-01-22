@@ -10,7 +10,8 @@ import os
 import open3d as o3d
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
-from physion.external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np
+from physion.external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np, compute_rotation_matrix_from_ortho6d
+import torch
 
 
 
@@ -369,7 +370,17 @@ class PointCloudVisualizer:
         self.vis.create_window()
 
     def create_point_cloud(self, points, color, corners=None, center = None):
-        if corners is not None and center is not None:
+        if corners is not None:
+            print("corners included")
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points)
+            pcd.colors = o3d.utility.Vector3dVector(color)
+            bbox_colors = np.array([[1.0, 0.0, 0.0]] * corners.shape[0])
+            corner_points = o3d.utility.Vector3dVector(corners)
+            corner_colors = o3d.utility.Vector3dVector(bbox_colors)
+            pcd.points.extend(corner_points)
+            pcd.colors.extend(corner_colors)
+        elif corners is not None and center is not None:
             print("corners included")
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(points)
@@ -378,7 +389,7 @@ class PointCloudVisualizer:
             center_color = np.array([[1.0, 0.0, 0.0]]* center.shape[0])
             corner_points = o3d.utility.Vector3dVector(corners)
             corner_colors = o3d.utility.Vector3dVector(bbox_colors)
-            print(center)
+            print("center included")
             pcd.points.extend(corner_points)
             pcd.colors.extend(corner_colors)
             pcd.points.extend(o3d.utility.Vector3dVector(center))
@@ -389,19 +400,24 @@ class PointCloudVisualizer:
             pcd.colors = o3d.utility.Vector3dVector(color)
         return pcd
 
-    def create_3d_bbox(self, center, dimensions, rotation_matrix=None, bbox_points=None, use_rot=False, use_points=False):
+    def create_3d_bbox(self, center=None, dimensions=None, rotation_matrix=None, bbox_points=None, use_rot=False, use_points=False):
         if use_rot:
             bbox = o3d.geometry.OrientedBoundingBox(center=center, R=rotation_matrix, extent=dimensions)
             bbox.color = (0,1,0)
             # bbox.translate(translation)
-        else:
-            bbox = o3d.geometry.OrientedBoundingBox(center=center, R=np.eye(3, 3), extent=dimensions)
-        if use_points:
+        
+        elif use_points:
+            bbox_points = np.array(bbox_points).reshape(7,3)
             bbox_points_vector = o3d.utility.Vector3dVector(bbox_points)
             bbox = o3d.geometry.OrientedBoundingBox.create_from_points(bbox_points_vector)
+            bbox.color = (0,1,0)
+
+        else:
+            bbox = o3d.geometry.OrientedBoundingBox(center=center, R=np.eye(3, 3), extent=dimensions)
         return bbox
 
-    def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, center = None, corners=None, bbox_points_list=None):
+    def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, center = None, corners=None, bbox_points_list=None, use_points=False):
+        
         pcd = self.create_point_cloud(points[:, :3], color = points[:, 3:], corners = corners, center = center)
         self.vis.add_geometry(pcd)
 
@@ -442,7 +458,9 @@ class PointCloudVisualizer:
                     use_rot=True,
                     use_points=False,
                     
-                )    
+                ) 
+            elif use_points:
+                bbox = self.create_3d_bbox(bbox_points=gt_bbox_info, use_points=True, use_rot=False)                  
             else:
                 print("Error in dimension of input, unable to visualize")
                 exit()
@@ -456,3 +474,91 @@ class PointCloudVisualizer:
         self.vis.destroy_window()
 
 
+#TODO: need to write properties for canonical space to world coordinates and vice versa in terms of utils
+#TODO: Need to store the canonical values correctly and since it is same across, it can be passed to the corners calculation correctly (directly)
+
+
+def canonical_to_world_np(points, R, trans, scale):
+    return R @ (np.diag(scale) @ points) + trans
+    
+def world_to_canonical_np(points, R, trans, scale):
+    return np.linalg.inv(np.diag(scale))@(np.linalg.inv(R)@(points - trans))
+
+def world_to_canonical(points, R, trans, scale):
+        return torch.matmul(torch.inverse(torch.diag_embed(scale)), torch.matmul(torch.inverse(R), (points - trans)))
+
+def canonical_to_world(points, R, trans, scale):
+        return torch.matmul(R, torch.matmul(torch.diag_embed(scale), points.unsqueeze(2))) + trans.unsqueeze(2)
+
+
+
+# class cameraUtilsTensor():
+#     def __init__(self, rot, trans, scale):
+#         self.R = get_ortho6d_from_R(rot)
+#         self.trans = trans
+#         self.scale = torch.diag(scale)
+        
+#     def world_to_canonical(self, points):
+#         return torch.matmul(torch.inverse(self.scale), torch.matmul(torch.inverse(R), (points - self.trans)))
+        
+#     def canonical_to_world(self, points):
+#         return torch.matmul(self.R, torch.matmul(self.scale, points)) + self.trans
+        
+        
+def convert_to_world_coords(gt_boxes_upright_depth_list):
+    canonical_values = {"center":[0, 0.5, 0],
+                    "front":[0, 0.5, 0.5],
+                    "top":[0, 1, 0],
+                    "back":[0, 0.5, -0.5],
+                    "bottom":[0,0,0],
+                    "left":[-0.5, 0.5, 0],
+                    "right":[0.5, 0.5, 0]}
+    gt_world_coords = []
+    for objects_info in gt_boxes_upright_depth_list:
+        points_world_coord = []
+        if not isinstance(objects_info, np.ndarray):
+            objects_info = np.array(objects_info)
+        for point, val in canonical_values.items():
+            if not isinstance(val, np.ndarray):
+                val = np.array(val)
+            points_world_coord.append(canonical_to_world_np(points=val,
+                                                             R=compute_rotation_matrix_from_ortho6d_np(objects_info[6:].reshape(1, 6)),
+                                                             trans=objects_info[:3],
+                                                             scale=objects_info[3:6]))
+        gt_world_coords.append(points_world_coord)
+    return gt_world_coords
+    
+
+def convert_to_world_coords_torch(gt_boxes_upright_depth_list):
+    canonical_values = {"center":[0, 0.5, 0],
+                    "front":[0, 0.5, 0.5],
+                    "top":[0, 1, 0],
+                    "back":[0, 0.5, -0.5],
+                    "bottom":[0,0,0],
+                    "left":[-0.5, 0.5, 0],
+                    "right":[0.5, 0.5, 0]}
+    gt_world_coords = []
+    
+    # Convert canonical values to torch tensors
+    canonical_values_torch = {key: torch.tensor(value, dtype=torch.float32) for key, value in canonical_values.items()}
+
+    for objects_info in gt_boxes_upright_depth_list:
+        points_world_coord = []
+        
+        # Convert objects_info to numpy array if it's not already
+        if not isinstance(objects_info, np.ndarray):
+            objects_info = np.array(objects_info)
+        
+        # Convert objects_info to torch tensor
+        objects_info_torch = torch.tensor(objects_info, dtype=torch.float32)
+        
+        for point, val in canonical_values_torch.items():
+            points_world_coord.append(canonical_to_world(points=val,
+                                                         R=compute_rotation_matrix_from_ortho6d(objects_info_torch[6:].reshape(1, 6)),
+                                                         trans=objects_info_torch[:3],
+                                                         scale=objects_info_torch[3:6]))
+        
+        gt_world_coords.append(points_world_coord)
+    
+    return gt_world_coords
+    

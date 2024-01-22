@@ -8,6 +8,8 @@ from mmdet3d.core.points import BasePoints
 from .base_box3d import BaseInstance3DBoxes
 from .utils import rotation_3d_in_axis
 from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
+from physion.physion_tools import canonical_to_world
+
 
 class Physion3DBoxes(object):
     def __init__(self, tensor, box_dim = 12, with_ortho6d=True, origin=(0.5, 0.5, 0)):
@@ -34,27 +36,9 @@ class Physion3DBoxes(object):
 
         self.with_ortho6d = with_ortho6d
         self.rotation_matrix = compute_rotation_matrix_from_ortho6d(tensor[:, 6:])
-        # import pdb; pdb.set_trace() 
-        # dims = self.tensor[:, 3:6]
-        # # dims[[0,1,2]] = dims[[1,2,0]]
-        # corners_norm = torch.from_numpy(
-        #     np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)).to(
-        #         device=dims.device, dtype=dims.dtype)
-
-        # corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
-        # # print(corners_norm)
-        # # use relative origin (0.5, 0.5, 0)
-        # # corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0])
-        # corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
-
-        # # # rotate around z axis
-        # # corners = rotation_3d_in_axis(
-        # #     corners, self.tensor[:, 6], axis=self.YAW_AXIS)
-        # # corners = corners.permute(0, 2, 1)
-        # # print(corners == corners@self.rotation_matrix)
-        # corners = self.rotation_matrix@corners.transpose(1,2)
-        # corners = corners.permute(0,2,1) 
-        # corners += self.tensor[:, :3].view(-1, 1, 3)
+        
+        
+        
     @property
     def orth6d(self):
         """
@@ -113,14 +97,42 @@ class Physion3DBoxes(object):
         if self.tensor.numel() == 0:
             return torch.empty([0, 8, 3], device=self.tensor.device)
         dims = self.tensor[:, 3:6]
-        corners_norm = torch.from_numpy(
-            np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)).to(
-                device=dims.device, dtype=dims.dtype)
+        
+        """corners
+        the coordinate system is [x,z,y],
+        with center being [0, 0.5, 0],
+        
+        The corners are:
+        [-0.5, 0, -0.5]
+        [-0.5, 1, -0.5]
+        [-0.5, 0, 0.5]
+        [-0.5, 1, 0.5]
+        [0.5, 0, 0.5]
+        [0.5, 1, 0.5]
+        [0.5, 0, -0.5]
+        [0.5, 1, -0,5]
+        
+        Then we multiply the scale in the form of [x,z,y] to get the cuboids, Then apply rotation and translation.
+        """
+        corners_norm = torch.stack([
+            torch.Tensor([-0.5, 0, -0.5]),
+            torch.Tensor([-0.5, 1, -0.5]),
+            torch.Tensor([-0.5, 0, 0.5]),
+            torch.Tensor([-0.5, 1, 0.5]),
+            torch.Tensor([0.5, 0, 0.5]),
+            torch.Tensor([0.5, 1, 0.5]),
+            torch.Tensor([0.5, 0, -0.5]),
+            torch.Tensor([0.5, 1, -0.5])            
+        ]).to(device=dims.device, dtype=dims.dtype)
+        # corners_norm = torch.from_numpy(
+        #     np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)).to(
+        #         device=dims.device, dtype=dims.dtype)
 
-        corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
+        # corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
+        
 
         # use relative origin (0.5, 0.5, 0.5)
-        corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0.5])
+        # corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0.5])
         corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
 
         corners = self.rotation_matrix@corners.transpose(1,2)
@@ -189,7 +201,9 @@ class Physion3DBoxes(object):
     @property
     def bottom_center(self):
         """torch.Tensor: A tensor with center of each box in shape (N, 3)."""
-        return self.tensor[:, :3]
+        # TODO: Need to build canonical to world
+        world_points = canonical_to_world(torch.Tensor([0, 0.5, 0]).repeat(self.tensor.shape[0],1), self.rotation_matrix, self.tensor[:, :3], self.tensor[:, 3:6])
+        return world_points.squeeze(2)
     
     @property
     def center(self):
