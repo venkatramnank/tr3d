@@ -6,8 +6,9 @@ import torch
 from mmcv.parallel import DataContainer as DC
 from mmcv.runner import auto_fp16
 
-from mmdet3d.core import Box3DMode, Coord3DMode, show_result
+from mmdet3d.core import Box3DMode, Coord3DMode, show_result, show_result_physion
 from mmdet.models.detectors import BaseDetector
+from physion.physion_tools import bbox_to_corners
 
 
 class Base3DDetector(BaseDetector):
@@ -61,7 +62,7 @@ class Base3DDetector(BaseDetector):
         else:
             return self.forward_test(**kwargs)
 
-    def show_results(self, data, result, out_dir, show=False, score_thr=None):
+    def show_results(self, data, result, out_dir, gt_bbox = None, show=False, score_thr=None):
         """Results visualization.
 
         Args:
@@ -75,6 +76,7 @@ class Base3DDetector(BaseDetector):
                 Default to None.
         """
         for batch_id in range(len(result)):
+            import pdb; pdb.set_trace()
             if isinstance(data['points'][0], DC):
                 points = data['points'][0]._data[0][batch_id].numpy()
             elif mmcv.is_list_of(data['points'][0], torch.Tensor):
@@ -97,13 +99,14 @@ class Base3DDetector(BaseDetector):
             file_name = osp.split(pts_filename)[-1].split('.')[0]
 
             assert out_dir is not None, 'Expect out_dir, got none.'
-
+            
             pred_bboxes = result[batch_id]['boxes_3d']
             pred_labels = result[batch_id]['labels_3d']
 
             if score_thr is not None:
                 mask = result[batch_id]['scores_3d'] > score_thr
-                pred_bboxes = pred_bboxes[mask]
+                # pred_bboxes = pred_bboxes[mask]
+                pred_bboxes = pred_bboxes[(mask == True).nonzero(as_tuple=True)[0]]
                 pred_labels = pred_labels[mask]
 
             # for now we convert points and bbox into depth mode
@@ -113,15 +116,21 @@ class Base3DDetector(BaseDetector):
                                                    Coord3DMode.DEPTH)
                 pred_bboxes = Box3DMode.convert(pred_bboxes, box_mode_3d,
                                                 Box3DMode.DEPTH)
-            elif box_mode_3d != Box3DMode.DEPTH:
+            elif box_mode_3d != Box3DMode.DEPTH or box_mode_3d != Box3DMode.PHYSION:
                 ValueError(
                     f'Unsupported box_mode_3d {box_mode_3d} for conversion!')
+            import pdb; pdb.set_trace()
+            
+            pred_corners = bbox_to_corners(pred_bboxes.tensor).cpu().numpy()
             pred_bboxes = pred_bboxes.tensor.cpu().numpy()
-            show_result(
+            
+            show_result_physion(
                 points,
-                None,
+                gt_bbox,
                 pred_bboxes,
                 out_dir,
                 file_name,
+                pred_corners=pred_corners,
+                gt_corners=bbox_to_corners(torch.from_numpy(gt_bbox)).cpu().numpy(),
                 show=show,
                 pred_labels=pred_labels)

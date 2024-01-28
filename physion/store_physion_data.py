@@ -1,6 +1,7 @@
 import warnings
 import h5py
 import os
+import torch
 from matplotlib.collections import PolyCollection
 import numpy as np
 import io
@@ -12,7 +13,7 @@ import matplotlib.pyplot as plt
 import math
 from mpl_toolkits.mplot3d import Axes3D
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
-from physion_tools import PhysionPointCloudGenerator, PointCloudVisualizer, canonical_to_world_np, world_to_canonical_np
+from physion_tools import PhysionPointCloudGenerator, PointCloudVisualizer, canonical_to_world_np, world_to_canonical_np, convert_to_world_coords, bbox_to_corners
 import matplotlib.pyplot as plt, numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -439,17 +440,17 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
             height = np.linalg.norm(points[4] - points[5])
 
             return [length, width, height]
-
+        # import pdb; pdb.set_trace()
         bbox_3d_dims = calculate_bounding_box_dimensions(points)
         dimensions_list.append([bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[2]])
-
+            
         yaw = math.atan2(2.0*(y*z + x*y), w*w + x*x - y*y - z*z)
         heading_ang.append(yaw)
         # [x, y, z, w, h, l, 6d representation of R]
         #TODO: need to change to scale and rotation
         # gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
         #  SCALE : [w,h,l] / [x,z,y]
-        gt_boxes_upright_depth = [t[0], t[1], t[2], scale[0], scale[1], scale[2]] + ortho6d.tolist()
+        gt_boxes_upright_depth = [t[0], t[1], t[2], bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
         # gt_boxes_upright_depth = [center, front, back, left, right, top, bottom]
         bbox_points = [center, front, top, back, bottom, left, right]
  
@@ -477,8 +478,8 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
                         "left":[-0.5, 0.5, 0],
                         "right":[0.5, 0.5, 0]}
     
-
-
+    # gt_world_coords = convert_to_world_coords(gt_boxes_upright_depth_list)
+    # gt_world_coords = bbox_to_corners(torch.tensor(gt_boxes_upright_depth_list))
     # visualizer = PointCloudVisualizer()
     # visualizer.visualize_point_cloud_and_bboxes(pcd_points, gt_world_coords, use_points=True)
 
@@ -526,10 +527,10 @@ if __name__ == "__main__":
     start = 50
     frames_per_vid = 20
     for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
-        if 'dominoes' in _file or 'collision' in _file:
+        if 'dominoes' in _file or 'collision' in _file: #TODO use dominoes only or 'collision' in _file
             for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
                 if os.path.join(PHYSION_HDF5_ROOT, _file, filename).endswith('hdf5'):
-                    vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, _file, filename) 
+                    vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, _file, filename)
                     print("Looking at : ", os.path.join(_file, filename))
                     try:
                         with h5py.File(vid_hdf5_path, 'r') as file:

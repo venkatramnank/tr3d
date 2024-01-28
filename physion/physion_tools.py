@@ -407,10 +407,26 @@ class PointCloudVisualizer:
             # bbox.translate(translation)
         
         elif use_points:
-            bbox_points = np.array(bbox_points).reshape(7,3)
-            bbox_points_vector = o3d.utility.Vector3dVector(bbox_points)
-            bbox = o3d.geometry.OrientedBoundingBox.create_from_points(bbox_points_vector)
-            bbox.color = (0,1,0)
+            #built using corners
+            # bbox_points = np.array(bbox_points).reshape(7,3)
+            # bbox_points_vector = o3d.utility.Vector3dVector(bbox_points)
+            # bbox = o3d.geometry.OrientedBoundingBox.create_from_points(bbox_points_vector)
+            # bbox.color = (0,1,0)
+            # mesh = o3d.geometry.TriangleMesh()
+            # vertices = bbox_points
+            # mesh.vertices = o3d.utility.Vector3dVector(vertices)
+            # mesh.triangles = o3d.utility.Vector3iVector([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7], [0, 3, 7], [0, 7, 4],
+            #                                      [1, 2, 6], [1, 6, 5], [0, 1, 5], [0, 5, 4], [2, 3, 7], [2, 7, 6]])
+            # bbox = mesh.get_oriented_bounding_box()
+            lines = [[0, 1], [1, 3], [2, 3], [2, 0],
+             [4, 5], [5, 7], [6, 7], [6, 4],
+             [1, 7], [0, 6], [2, 4], [3, 5]]
+
+            lineset = o3d.geometry.LineSet()
+            lineset.points = o3d.utility.Vector3dVector(bbox_points)
+            lineset.lines = o3d.utility.Vector2iVector(lines)
+            lineset.colors = o3d.utility.Vector3dVector([[0,1,0]] * len(lines))
+            bbox = lineset
 
         else:
             bbox = o3d.geometry.OrientedBoundingBox(center=center, R=np.eye(3, 3), extent=dimensions)
@@ -488,7 +504,7 @@ def world_to_canonical(points, R, trans, scale):
         return torch.matmul(torch.inverse(torch.diag_embed(scale)), torch.matmul(torch.inverse(R), (points - trans)))
 
 def canonical_to_world(points, R, trans, scale):
-        return torch.matmul(R, torch.matmul(torch.diag_embed(scale), points.unsqueeze(2))) + trans.unsqueeze(2)
+        return torch.matmul(R, torch.matmul(torch.diag_embed(scale), points.unsqueeze(1))) + trans.unsqueeze(1)
 
 
 
@@ -521,13 +537,20 @@ def convert_to_world_coords(gt_boxes_upright_depth_list):
         for point, val in canonical_values.items():
             if not isinstance(val, np.ndarray):
                 val = np.array(val)
-            points_world_coord.append(canonical_to_world_np(points=val,
-                                                             R=compute_rotation_matrix_from_ortho6d_np(objects_info[6:].reshape(1, 6)),
-                                                             trans=objects_info[:3],
-                                                             scale=objects_info[3:6]))
+            if not objects_info[6:].any():
+                points_world_coord.append(canonical_to_world_np(points=val,
+                                                                R=np.eye(3),
+                                                                trans=objects_info[:3],
+                                                                scale=objects_info[3:6]))
+            else:
+                points_world_coord.append(canonical_to_world_np(points=val,
+                                                            R=compute_rotation_matrix_from_ortho6d_np(objects_info[6:].reshape(1, 6)),
+                                                            trans=objects_info[:3],
+                                                            scale=objects_info[3:6]))
         gt_world_coords.append(points_world_coord)
     return gt_world_coords
     
+
 
 def convert_to_world_coords_torch(gt_boxes_upright_depth_list):
     canonical_values = {"center":[0, 0.5, 0],
@@ -546,19 +569,104 @@ def convert_to_world_coords_torch(gt_boxes_upright_depth_list):
         points_world_coord = []
         
         # Convert objects_info to numpy array if it's not already
-        if not isinstance(objects_info, np.ndarray):
-            objects_info = np.array(objects_info)
+        if not isinstance(objects_info, torch.Tensor):
+            objects_info = torch.Tensor(objects_info, dtype=torch.float32)
         
         # Convert objects_info to torch tensor
-        objects_info_torch = torch.tensor(objects_info, dtype=torch.float32)
+        # objects_info_torch = torch.Tensor(objects_info, dtype=torch.float32)
         
         for point, val in canonical_values_torch.items():
-            points_world_coord.append(canonical_to_world(points=val,
-                                                         R=compute_rotation_matrix_from_ortho6d(objects_info_torch[6:].reshape(1, 6)),
-                                                         trans=objects_info_torch[:3],
-                                                         scale=objects_info_torch[3:6]))
+            points_world_coord.append((canonical_to_world(points=val,
+                                                         R=compute_rotation_matrix_from_ortho6d(objects_info[6:].reshape(1, 6)),
+                                                         trans=objects_info[:3],
+                                                         scale=objects_info[3:6]).squeeze(0)).squeeze(1))
         
-        gt_world_coords.append(points_world_coord)
+        gt_world_coords.append(torch.stack(points_world_coord))
+
+    return torch.stack(gt_world_coords)
+
+
+
+def bbox_to_corners(bbox):
+    """Converts the center, h,w,l,ortho6d format into corners
+
+    Args:
+        bbox (Tensor): Input of size (N, 12)
+
+    Returns:
+        Tensor: Corners (including the center) of shape (N, 8, 3)
+    """
+    if bbox.shape[-1] != 12:
+        return bbox
     
-    return gt_world_coords
+    if bbox.numel() == 0:
+        return torch.empty([0, 8, 3], device=bbox.device)
     
+    dims = bbox[:, 3:6]
+    corners_norm = torch.stack([
+        torch.Tensor([-0.5, 0, -0.5]),
+        torch.Tensor([-0.5, 1, -0.5]),
+        torch.Tensor([-0.5, 0, 0.5]),
+        torch.Tensor([-0.5, 1, 0.5]),
+        torch.Tensor([0.5, 0, 0.5]),
+        torch.Tensor([0.5, 1, 0.5]),
+        torch.Tensor([0.5, 0, -0.5]),
+        torch.Tensor([0.5, 1, -0.5])            
+    ]).to(device=dims.device, dtype=dims.dtype)
+    
+    corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
+    if torch.all(bbox[:, 6:]== 0):
+        rotation_matrix = torch.eye(3)
+    else:
+        rotation_matrix = compute_rotation_matrix_from_ortho6d(bbox[:, 6:])
+    corners = rotation_matrix@corners.transpose(1,2)
+    corners = corners.permute(0,2,1) 
+    corners += bbox[:, :3].view(-1, 1, 3)
+    """
+    #NOTE: Enable gradient tracking
+    corners.requires_grad_(True)
+
+    def hook_fn(grad):
+        print('Gradients passing through bbox_to_corners:', grad)
+
+    # Register the hook to the tensor
+    corners.register_hook(hook_fn)
+    """
+    return corners
+
+
+
+def bbox_to_corners_np(bbox):
+    """Converts the center, h, w, l, ortho6d format into corners
+
+    Args:
+        bbox (numpy.ndarray): Input of shape (N, 12)
+
+    Returns:
+        numpy.ndarray: Corners (including the center) of shape (N, 8, 3)
+    """
+    if bbox.shape[-1] != 12:
+        return bbox
+
+    if bbox.size == 0:
+        return np.empty((0, 8, 3), dtype=bbox.dtype)
+
+    dims = bbox[:, 3:6]
+    corners_norm = np.array([
+        [-0.5, 0, -0.5],
+        [-0.5, 1, -0.5],
+        [-0.5, 0, 0.5],
+        [-0.5, 1, 0.5],
+        [0.5, 0, 0.5],
+        [0.5, 1, 0.5],
+        [0.5, 0, -0.5],
+        [0.5, 1, -0.5]
+    ], dtype=dims.dtype)
+
+    corners = dims[:, np.newaxis, :] * corners_norm[np.newaxis, :, :]
+    rotation_matrix = compute_rotation_matrix_from_ortho6d_np(bbox[:, 6:])
+    corners = np.matmul(rotation_matrix, corners.transpose(0, 2, 1))
+    corners = corners.transpose(0, 2, 1)
+    corners += bbox[:, :3][:, np.newaxis, :]
+
+    return corners

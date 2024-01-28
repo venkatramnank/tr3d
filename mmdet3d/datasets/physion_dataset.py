@@ -266,6 +266,7 @@ class PhysionDataset(Custom3DDataset):
         Returns:
             dict: Evaluation results.
         """
+        # import pdb; pdb.set_trace()
         # evaluate 3D detection performance
         if isinstance(results[0], dict):
             return super().evaluate(results, metric, iou_thr, logger, show,

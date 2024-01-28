@@ -32,15 +32,44 @@ def iou(boxes_preds, boxes_labels):
 
 def nms_3d(bboxes, iou_threshold, score_threshold, scores):
     #TODO: need to modify accordingly
-    assert type(bboxes) == list
+    n_classes = scores.shape[1]
+    nms_bboxes, nms_scores, nms_labels = [], [], []
+    nms_indices = []
+    for i in range(n_classes):
+        ids = scores[:, i] > score_threshold
+        if not ids.any():
+                continue
+        
+        class_scores = scores[ids, i]
+        class_bboxes = bboxes[ids]
+        sorted_indices = torch.argsort(class_scores, 0,True)
+        sorted_class_bboxes = class_bboxes[sorted_indices]
 
+        while sorted_class_bboxes:
+            chosen_box = sorted_class_bboxes[0]
+            sorted_class_bboxes = sorted_class_bboxes[1:]
+
+            selected_indices = [
+                idx
+                for idx, box in enumerate(bboxes)
+                if idx in ids and 
+                iou(chosen_box, box) < iou_threshold
+            ]
+            nms_indices.extend(selected_indices)
+        nms_bboxes.append(class_bboxes[nms_indices])
+        nms_scores.append(class_scores[nms_indices])
+        nms_labels.append(
+        bboxes.new_full(
+                    class_scores[nms_indices].shape, i, dtype=torch.long))
+
+        
     num_boxes = len(bboxes)
     
     # Filter out bboxes below the score threshold
     bboxes = [box for box in bboxes if box[1] > score_threshold]
 
     # Sort bboxes based on class scores
-    bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
+    bboxes = sorted(bboxes, key=scores, reverse=True)
     bboxes_after_nms = []
 
     while bboxes:

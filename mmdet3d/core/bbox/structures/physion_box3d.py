@@ -1,4 +1,4 @@
-# Box 3d based on depth_box3d and base_box3d for Physion dataset to include quartenions
+# Box 3d based on depth_box3d and base_box3d for Physion dataset to include ortho 6D
 import numpy as np
 import torch
 import warnings
@@ -36,7 +36,7 @@ class Physion3DBoxes(object):
 
         self.with_ortho6d = with_ortho6d
         self.rotation_matrix = compute_rotation_matrix_from_ortho6d(tensor[:, 6:])
-        
+        self.box_dim = box_dim
         
         
     @property
@@ -271,13 +271,54 @@ class Physion3DBoxes(object):
             return original_type(
                 self.tensor[item].view(1, -1),
                 box_dim=self.box_dim,
-                with_quaternion=self.with_quaternion)
+                with_ortho6d=self.with_ortho6d)
         b = self.tensor[item]
         assert b.dim() == 2, \
             f'Indexing on Boxes with {item} failed to return a matrix!'
-        return original_type(b, box_dim=self.box_dim, with_quaternion=self.with_quaternion)
+        return original_type(b, box_dim=self.box_dim, with_ortho6d=self.with_ortho6d)
 
 
+    @property
+    def device(self):
+        """str: The device of the boxes are on."""
+        return self.tensor.device
+    
+
+    def to(self, device):
+        """Convert current boxes to a specific device.
+
+        Args:
+            device (str | :obj:`torch.device`): The name of the device.
+
+        Returns:
+            :obj:`BaseInstance3DBoxes`: A new boxes object on the
+                specific device.
+        """
+        original_type = type(self)
+        return original_type(
+            self.tensor.to(device),
+            box_dim=self.box_dim,
+            with_ortho6d=self.with_ortho6d)
     # def rotate(self, angle, points=None):
     #     pass
   
+
+
+    def new_box(self, data):
+        """Create a new box object with data.
+
+        The new box and its tensor has the similar properties
+            as self and self.tensor, respectively.
+
+        Args:
+            data (torch.Tensor | numpy.array | list): Data to be copied.
+
+        Returns:
+            :obj:`BaseInstance3DBoxes`: A new bbox object with ``data``,
+                the object's other properties are similar to ``self``.
+        """
+        new_tensor = self.tensor.new_tensor(data) \
+            if not isinstance(data, torch.Tensor) else data.to(self.device)
+        original_type = type(self)
+        return original_type(
+            new_tensor, box_dim=self.box_dim, with_ortho6d=self.with_ortho6d)

@@ -5,6 +5,7 @@ import mmcv
 import numpy as np
 import trimesh
 import matplotlib.pyplot as plt
+from physion.physion_tools import PointCloudVisualizer, convert_to_world_coords
 
 from .image_vis import (draw_camera_bbox3d_on_img, draw_depth_bbox3d_on_img,
                         draw_lidar_bbox3d_on_img)
@@ -91,7 +92,36 @@ def _write_oriented_bbox_v2(corners, labels, out_filename):
                     file.write(f' {j + l}')
                 file.write('\n')
 
-
+def show_result_physion(
+    points,
+    gt_bboxes,
+    pred_bboxes,
+    out_dir,
+    filename,
+    pred_corners = None,
+    gt_corners = None, 
+    show = False,
+    pred_labels = None
+):
+    import pdb; pdb.set_trace()
+    result_path = osp.join(out_dir, filename)
+    mmcv.mkdir_or_exist(result_path)
+    
+    
+    # getting the world coordinates points from canonical coordinates
+    
+    pred_bboxes_world_coords = convert_to_world_coords(pred_bboxes)
+    
+    if gt_bboxes:
+        gt_bboxes_world_coords = convert_to_world_coords(gt_bboxes)
+    
+    if show:
+        visualizer = PointCloudVisualizer()
+        visualizer.visualize_point_cloud_and_bboxes(points, pred_corners, corners = pred_corners.reshape(pred_corners.shape[0]*pred_corners.shape[1], 3), use_points=True)
+        visualizer.visualize_point_cloud_and_bboxes(points, gt_corners, corners = gt_corners.reshape(gt_corners.shape[0]*gt_corners.shape[1], 3), use_points=True)
+    
+    
+    
 def show_result(points,
                 gt_bboxes,
                 pred_bboxes,

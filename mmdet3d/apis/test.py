@@ -35,7 +35,9 @@ def single_gpu_test(model,
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
-    for i, data in enumerate(data_loader):
+    for i, (data, data_infos) in enumerate(zip(data_loader, vars(dataset)['data_infos'])):
+        import pdb; pdb.set_trace()
+        gt_data = data_infos['annos']['gt_boxes_upright_depth']
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, **data)
 
@@ -49,6 +51,7 @@ def single_gpu_test(model,
                 model.module.show_results(
                     data,
                     result,
+                    gt_bbox=gt_data,
                     out_dir=out_dir,
                     show=show,
                     score_thr=show_score_thr)

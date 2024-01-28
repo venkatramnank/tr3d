@@ -97,17 +97,24 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             dict: Centerness, bbox and classification loss values.
         """
-        # import pdb; pdb.set_trace()
         ######################################################################################
-        # visualizing the points and gt_bboxes_3d to make sure it is alright
+        # import pdb; pdb.set_trace()
+        # # visualizing the points and gt_bboxes_3d to make sure it is alright
         # visualizer = PointCloudVisualizer()
-        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), convert_to_world_coords(gt_bboxes_3d[0].tensor.cpu().numpy()), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True)
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True)
         #####################################################################################
         x = self.extract_feats(points)
-        # import pdb; pdb.set_trace()
         losses = self.head.forward_train(x, gt_bboxes_3d, gt_labels_3d,
                                          img_metas)
         return losses
+
+
+    def _box3dcornertoresult(self, bbox_corners, cls_preds):
+        result_dict = dict(
+            boxes_corners = bbox_corners.to('cpu'),
+            cls_preds = [cls_preds[0].to('cpu'), cls_preds[1].to('cpu')]
+        )
+        return result_dict
 
     def simple_test(self, points, img_metas, *args, **kwargs):
         """Test without augmentations.
@@ -125,6 +132,8 @@ class MinkSingleStage3DDetector(Base3DDetector):
             bbox3d2result(bboxes, scores, labels)
             for bboxes, scores, labels in bbox_list
         ]
+        # bbox_results = [self._box3dcornertoresult(bbox_corners, cls_preds)
+        #                 for bbox_corners, cls_preds in bbox_list]
         return bbox_results
 
     def aug_test(self, points, img_metas, **kwargs):

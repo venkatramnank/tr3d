@@ -35,7 +35,7 @@ log_config = dict(
     interval=50,
     hooks=[
         dict(type='TextLoggerHook'),
-        # dict(type='TensorboardLoggerHook')
+        dict(type='TensorboardLoggerHook')
 ])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
@@ -98,7 +98,7 @@ test_pipeline = [
 ]
 data = dict(
     samples_per_gpu=16,
-    workers_per_gpu=0,
+    workers_per_gpu=2,
     train=dict(
         type='RepeatDataset',
         times=5,
