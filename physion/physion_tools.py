@@ -561,16 +561,16 @@ def convert_to_world_coords_torch(gt_boxes_upright_depth_list):
                     "left":[-0.5, 0.5, 0],
                     "right":[0.5, 0.5, 0]}
     gt_world_coords = []
-    
+    dev = gt_boxes_upright_depth_list.device
     # Convert canonical values to torch tensors
-    canonical_values_torch = {key: torch.tensor(value, dtype=torch.float32) for key, value in canonical_values.items()}
+    canonical_values_torch = {key: torch.tensor(value, dtype=torch.float32, device=dev) for key, value in canonical_values.items()}
 
     for objects_info in gt_boxes_upright_depth_list:
         points_world_coord = []
         
         # Convert objects_info to numpy array if it's not already
         if not isinstance(objects_info, torch.Tensor):
-            objects_info = torch.Tensor(objects_info, dtype=torch.float32)
+            objects_info = torch.Tensor(objects_info, dtype=torch.float32, device=dev)
         
         # Convert objects_info to torch tensor
         # objects_info_torch = torch.Tensor(objects_info, dtype=torch.float32)

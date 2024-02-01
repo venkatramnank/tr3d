@@ -132,5 +132,5 @@ class Base3DDetector(BaseDetector):
                 file_name,
                 pred_corners=pred_corners,
                 gt_corners=bbox_to_corners(torch.from_numpy(gt_bbox)).cpu().numpy(),
-                show=show,
+                show=show, #TODO need to set this to show
                 pred_labels=pred_labels)
