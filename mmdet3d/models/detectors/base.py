@@ -76,7 +76,6 @@ class Base3DDetector(BaseDetector):
                 Default to None.
         """
         for batch_id in range(len(result)):
-            import pdb; pdb.set_trace()
             if isinstance(data['points'][0], DC):
                 points = data['points'][0]._data[0][batch_id].numpy()
             elif mmcv.is_list_of(data['points'][0], torch.Tensor):
@@ -119,7 +118,6 @@ class Base3DDetector(BaseDetector):
             elif box_mode_3d != Box3DMode.DEPTH or box_mode_3d != Box3DMode.PHYSION:
                 ValueError(
                     f'Unsupported box_mode_3d {box_mode_3d} for conversion!')
-            import pdb; pdb.set_trace()
             
             pred_corners = bbox_to_corners(pred_bboxes.tensor).cpu().numpy()
             pred_bboxes = pred_bboxes.tensor.cpu().numpy()

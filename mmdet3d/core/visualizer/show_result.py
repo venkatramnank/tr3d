@@ -103,7 +103,7 @@ def show_result_physion(
     show = False,
     pred_labels = None
 ):
-    import pdb; pdb.set_trace()
+
     # result_path = osp.join(out_dir, filename)
     # mmcv.mkdir_or_exist(result_path)
     
@@ -118,7 +118,7 @@ def show_result_physion(
     if show:
         visualizer = PointCloudVisualizer()
         visualizer.visualize_point_cloud_and_bboxes(points, pred_corners, corners = pred_corners.reshape(pred_corners.shape[0]*pred_corners.shape[1], 3), use_points=True)
-        visualizer.visualize_point_cloud_and_bboxes(points, gt_corners, corners = gt_corners.reshape(gt_corners.shape[0]*gt_corners.shape[1], 3), use_points=True)
+        # visualizer.visualize_point_cloud_and_bboxes(points, gt_corners, corners = gt_corners.reshape(gt_corners.shape[0]*gt_corners.shape[1], 3), use_points=True)
         
     
     
