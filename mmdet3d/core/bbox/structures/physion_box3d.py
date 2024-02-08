@@ -202,7 +202,8 @@ class Physion3DBoxes(object):
     def bottom_center(self):
         """torch.Tensor: A tensor with center of each box in shape (N, 3)."""
         # TODO: Need to build canonical to world
-        world_points = canonical_to_world(torch.Tensor([0, 0.5, 0]).repeat(self.tensor.shape[0],1), self.rotation_matrix, self.tensor[:, :3], self.tensor[:, 3:6])
+        # world_points = canonical_to_world(torch.Tensor([0, 0.5, 0]).repeat(self.tensor.shape[0],1), self.rotation_matrix, self.tensor[:, :3], self.tensor[:, 3:6])
+        world_points = torch.matmul(self.rotation_matrix, torch.matmul(torch.diag_embed(self.tensor[:, 3:6]), torch.Tensor([0, 0.5, 0]).repeat(self.tensor.shape[0],1).unsqueeze(2))) + self.tensor[:, :3].unsqueeze(2)
         return world_points.squeeze(2)
     
     @property
