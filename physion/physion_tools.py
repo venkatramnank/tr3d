@@ -370,17 +370,8 @@ class PointCloudVisualizer:
         self.vis.create_window()
 
     def create_point_cloud(self, points, color, corners=None, center = None):
-        if corners is not None:
-            print("corners included")
-            pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(points)
-            pcd.colors = o3d.utility.Vector3dVector(color)
-            bbox_colors = np.array([[1.0, 0.0, 0.0]] * corners.shape[0])
-            corner_points = o3d.utility.Vector3dVector(corners)
-            corner_colors = o3d.utility.Vector3dVector(bbox_colors)
-            pcd.points.extend(corner_points)
-            pcd.colors.extend(corner_colors)
-        elif corners is not None and center is not None:
+        
+        if corners is not None and center is not None:
             print("corners included")
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(points)
@@ -394,6 +385,16 @@ class PointCloudVisualizer:
             pcd.colors.extend(corner_colors)
             pcd.points.extend(o3d.utility.Vector3dVector(center))
             pcd.colors.extend(o3d.utility.Vector3dVector(center_color))
+        elif corners is not None:
+            print("corners included")
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points)
+            pcd.colors = o3d.utility.Vector3dVector(color)
+            bbox_colors = np.array([[1.0, 0.0, 0.0]] * corners.shape[0])
+            corner_points = o3d.utility.Vector3dVector(corners)
+            corner_colors = o3d.utility.Vector3dVector(bbox_colors)
+            pcd.points.extend(corner_points)
+            pcd.colors.extend(corner_colors)
         else:
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(points)
@@ -433,7 +434,6 @@ class PointCloudVisualizer:
         return bbox
 
     def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, center = None, corners=None, bbox_points_list=None, use_points=False):
-        
         pcd = self.create_point_cloud(points[:, :3], color = points[:, 3:], corners = corners, center = center)
         self.vis.add_geometry(pcd)
 
@@ -553,6 +553,7 @@ def convert_to_world_coords(gt_boxes_upright_depth_list):
 
 
 def convert_to_world_coords_torch(gt_boxes_upright_depth_list):
+    # import pdb; pdb.set_trace()
     canonical_values = {"center":[0, 0.5, 0],
                     "front":[0, 0.5, 0.5],
                     "top":[0, 1, 0],

@@ -15,7 +15,7 @@ from mmdet3d.models.builder import HEADS, build_loss
 from mmdet.core.bbox.builder import BBOX_ASSIGNERS, build_assigner
 from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
 from physion.physion_tools import PointCloudVisualizer, convert_to_world_coords_torch
-from physion.physion_nms import iou
+# from physion.physion_nms import iou
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -86,7 +86,7 @@ class TR3DHead(BaseModule):
 
     
     @staticmethod
-    def bbox_to_corners(bbox):
+    def bbox_to_corners(bbox, center):
         """Converts the center, h,w,l,ortho6d format into corners
 
         Args:
@@ -95,6 +95,7 @@ class TR3DHead(BaseModule):
         Returns:
             Tensor: Corners (including the center) of shape (N, 8, 3)
         """
+        import pdb; pdb.set_trace()
         if bbox.shape[-1] != 12:
             return bbox
         
@@ -103,21 +104,21 @@ class TR3DHead(BaseModule):
         
         dims = bbox[:, 3:6]
         corners_norm = torch.stack([
-            torch.Tensor([-0.5, 0, -0.5]),
-            torch.Tensor([-0.5, 1, -0.5]),
-            torch.Tensor([-0.5, 0, 0.5]),
-            torch.Tensor([-0.5, 1, 0.5]),
-            torch.Tensor([0.5, 0, 0.5]),
-            torch.Tensor([0.5, 1, 0.5]),
-            torch.Tensor([0.5, 0, -0.5]),
-            torch.Tensor([0.5, 1, -0.5])            
+            torch.Tensor([0.5, 0.5, 0.5]),
+            torch.Tensor([0.5, 0.5, -0.5]),
+            torch.Tensor([0.5, -0.5, 0.5]),
+            torch.Tensor([0.5, -0.5, -0.5]),
+            torch.Tensor([-0.5, 0.5, 0.5]),
+            torch.Tensor( [-0.5, 0.5, -0.5]),
+            torch.Tensor([-0.5, -0.5, 0.5]),
+            torch.Tensor([-0.5, -0.5, -0.5])            
         ]).to(device=dims.device, dtype=dims.dtype)
        
         corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
         rotation_matrix = compute_rotation_matrix_from_ortho6d(bbox[:, 6:])
         corners = rotation_matrix@corners.transpose(1,2)
         corners = corners.permute(0,2,1) 
-        corners += bbox[:, :3].view(-1, 1, 3)
+        corners += center.view(-1, 1, 3)
         """
         #NOTE: Enable gradient tracking
         corners.requires_grad_(True)
@@ -228,7 +229,7 @@ class TR3DHead(BaseModule):
 
             if pos_bbox_preds.shape[1] == 6:
                 pos_bbox_targets = pos_bbox_targets[:, :6]
-
+            self.bbox_to_corners(pos_bbox_targets, center_pos_bbox_targets)
             # bbox_loss = self.bbox_loss(
             #     self._bbox_to_loss(
             #         self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
@@ -238,8 +239,8 @@ class TR3DHead(BaseModule):
             #     self.bbox_to_corners(pos_bbox_targets)
             # )
             bbox_loss = self.bbox_loss(
-            torch.concat((self.bbox_to_corners(pos_bbox_preds),center_pos_bbox_preds), dim=1),
-            torch.concat((self.bbox_to_corners(pos_bbox_targets),center_pos_bbox_targets), dim=1) 
+            torch.concat((self.bbox_to_corners(pos_bbox_preds, center_pos_bbox_preds),center_pos_bbox_preds), dim=1) + pos_points.unsqueeze(1),
+            torch.concat((self.bbox_to_corners(pos_bbox_targets, center_pos_bbox_targets),center_pos_bbox_targets), dim=1) 
             )            
             # iou(self.bbox_to_corners(pos_bbox_preds),
             #     self.bbox_to_corners(pos_bbox_targets))           
