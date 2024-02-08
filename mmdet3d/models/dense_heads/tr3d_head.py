@@ -15,7 +15,7 @@ from mmdet3d.models.builder import HEADS, build_loss
 from mmdet.core.bbox.builder import BBOX_ASSIGNERS, build_assigner
 from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
 from physion.physion_tools import PointCloudVisualizer, convert_to_world_coords_torch
-from physion.physion_nms import iou
+# from physion.physion_nms import iou
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -87,7 +87,7 @@ class TR3DHead(BaseModule):
     
     @staticmethod
     def bbox_to_corners(bbox):
-        """Converts the center, h,w,l,ortho6d format into corners
+        """Converts the translation, scale,ortho6d format into corners
 
         Args:
             bbox (Tensor): Input of size (N, 12)
@@ -238,7 +238,7 @@ class TR3DHead(BaseModule):
             #     self.bbox_to_corners(pos_bbox_targets)
             # )
             bbox_loss = self.bbox_loss(
-            torch.concat((self.bbox_to_corners(pos_bbox_preds),center_pos_bbox_preds), dim=1),
+            torch.concat((self.bbox_to_corners(pos_bbox_preds),center_pos_bbox_preds), dim=1) + pos_points.unsqueeze(1) ,
             torch.concat((self.bbox_to_corners(pos_bbox_targets),center_pos_bbox_targets), dim=1) 
             )            
             # iou(self.bbox_to_corners(pos_bbox_preds),
