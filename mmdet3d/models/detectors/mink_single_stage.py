@@ -129,8 +129,8 @@ class MinkSingleStage3DDetector(Base3DDetector):
         x = self.extract_feats(points)
         bbox_list = self.head.forward_test(x, img_metas)
         bbox_results = [
-            bbox3d2result(bboxes, scores, labels)
-            for bboxes, scores, labels in bbox_list
+            bbox3d2result(bboxes, scores, labels, points)
+            for bboxes, scores, labels, points in bbox_list
         ]
         # bbox_results = [self._box3dcornertoresult(bbox_corners, cls_preds)
         #                 for bbox_corners, cls_preds in bbox_list]

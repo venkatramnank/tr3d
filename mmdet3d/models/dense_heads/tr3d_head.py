@@ -353,7 +353,8 @@ class TR3DHead(BaseModule):
         #     points = points[ids]
 
         # boxes = self._bbox_pred_to_bbox(points, bbox_preds)
-        boxes_corners = self.bbox_to_corners(bbox_preds)
+        
+        boxes_corners = self.bbox_to_corners(bbox_preds) 
         
         #TODO: Need to fix NMS for 3d
         # import pdb; pdb.set_trace()
@@ -363,7 +364,7 @@ class TR3DHead(BaseModule):
             bbox_preds,
             box_dim=12,
             with_ortho6d=True)
-        return bbox_preds, scores, labels
+        return bbox_preds, scores, labels, points
 
     def _get_bboxes(self, bbox_preds, cls_preds, points, img_metas):
         results = []

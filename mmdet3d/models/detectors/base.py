@@ -75,6 +75,7 @@ class Base3DDetector(BaseDetector):
             score_thr (float, optional): Score threshold of bounding boxes.
                 Default to None.
         """
+        import pdb;pdb.set_trace()
         for batch_id in range(len(result)):
             if isinstance(data['points'][0], DC):
                 points = data['points'][0]._data[0][batch_id].numpy()
@@ -98,15 +99,16 @@ class Base3DDetector(BaseDetector):
             file_name = osp.split(pts_filename)[-1].split('.')[0]
 
             assert out_dir is not None, 'Expect out_dir, got none.'
-            
+            points_mink = result[batch_id]['points']
             pred_bboxes = result[batch_id]['boxes_3d']
             pred_labels = result[batch_id]['labels_3d']
-
+            # import pdb; pdb.set_trace()
             if score_thr is not None:
                 mask = result[batch_id]['scores_3d'] > score_thr
                 # pred_bboxes = pred_bboxes[mask]
                 pred_bboxes = pred_bboxes[(mask == True).nonzero(as_tuple=True)[0]]
                 pred_labels = pred_labels[mask]
+                points_mink = points_mink[(mask == True).nonzero(as_tuple=True)[0]]
 
             # for now we convert points and bbox into depth mode
             if (box_mode_3d == Box3DMode.CAM) or (box_mode_3d
@@ -119,7 +121,7 @@ class Base3DDetector(BaseDetector):
                 ValueError(
                     f'Unsupported box_mode_3d {box_mode_3d} for conversion!')
             
-            pred_corners = bbox_to_corners(pred_bboxes.tensor).cpu().numpy()
+            pred_corners = (bbox_to_corners(pred_bboxes.tensor) + points_mink.unsqueeze(1)).cpu().numpy()
             pred_bboxes = pred_bboxes.tensor.cpu().numpy()
             
             show_result_physion(
