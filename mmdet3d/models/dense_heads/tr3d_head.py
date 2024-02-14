@@ -60,11 +60,11 @@ class TR3DHead(BaseModule):
         reg_final = self.bbox_conv(x).features
         # reg_distance = torch.exp(reg_final[:, 3:6])
         reg_distance = reg_final[:, 3:6]
-        
+        reg_center = reg_final[:, :3]
         #TODO: Need to fix this for accepting 6d 
         # reg_angle = reg_final[:, 6:]
         reg_6d_ortho = reg_final[:, 6:]
-        bbox_pred = torch.cat((reg_final[:, :3], reg_distance, reg_6d_ortho), dim=1)
+        bbox_pred = torch.cat((reg_center, reg_distance, reg_6d_ortho), dim=1)
         cls_pred = self.cls_conv(x).features
 
         bbox_preds, cls_preds, points = [], [], []
@@ -86,7 +86,7 @@ class TR3DHead(BaseModule):
 
     
     @staticmethod
-    def bbox_to_corners(bbox, center):
+    def bbox_to_corners(bbox):
         """Converts the center, h,w,l,ortho6d format into corners
 
         Args:
@@ -95,13 +95,13 @@ class TR3DHead(BaseModule):
         Returns:
             Tensor: Corners (including the center) of shape (N, 8, 3)
         """
-        import pdb; pdb.set_trace()
+
         if bbox.shape[-1] != 12:
             return bbox
         
         if bbox.numel() == 0:
             return torch.empty([0, 8, 3], device=bbox.device)
-        
+        center = bbox[:, :3]
         dims = bbox[:, 3:6]
         corners_norm = torch.stack([
             torch.Tensor([0.5, 0.5, 0.5]),
@@ -220,16 +220,11 @@ class TR3DHead(BaseModule):
             pos_bbox_preds = bbox_preds[pos_mask]
             bbox_targets = torch.cat((gt_bboxes.tensor[:, :3], gt_bboxes.tensor[:, 3:]), dim=1)
             pos_bbox_targets = bbox_targets.to(points.device)[assigned_ids][pos_mask]
-            
-            ######################################
-            # getting the center of pred and gt and append to the 8 corners
-            center_pos_bbox_preds = convert_to_world_coords_torch(pos_bbox_preds)[:, :1, :].to(points.device)
-            center_pos_bbox_targets = convert_to_world_coords_torch(pos_bbox_targets)[:, :1, :].to(points.device)
-            ######################################
+
 
             if pos_bbox_preds.shape[1] == 6:
                 pos_bbox_targets = pos_bbox_targets[:, :6]
-            self.bbox_to_corners(pos_bbox_targets, center_pos_bbox_targets)
+
             # bbox_loss = self.bbox_loss(
             #     self._bbox_to_loss(
             #         self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
@@ -239,8 +234,8 @@ class TR3DHead(BaseModule):
             #     self.bbox_to_corners(pos_bbox_targets)
             # )
             bbox_loss = self.bbox_loss(
-            torch.concat((self.bbox_to_corners(pos_bbox_preds, center_pos_bbox_preds),center_pos_bbox_preds), dim=1) + pos_points.unsqueeze(1),
-            torch.concat((self.bbox_to_corners(pos_bbox_targets, center_pos_bbox_targets),center_pos_bbox_targets), dim=1) 
+            self.bbox_to_corners(pos_bbox_preds) + pos_points.unsqueeze(1),
+            self.bbox_to_corners(pos_bbox_targets) 
             )            
             # iou(self.bbox_to_corners(pos_bbox_preds),
             #     self.bbox_to_corners(pos_bbox_targets))           
@@ -364,7 +359,7 @@ class TR3DHead(BaseModule):
             bbox_preds,
             box_dim=12,
             with_ortho6d=True)
-        return bbox_preds, scores, labels
+        return bbox_preds, scores, labels, points
 
     def _get_bboxes(self, bbox_preds, cls_preds, points, img_metas):
         results = []
@@ -408,7 +403,6 @@ class TR3DAssigner:
 
         boxes = torch.cat((gt_bboxes.tensor[:, :3], gt_bboxes.tensor[:, 3:]), dim=1) #essentially the tensor
         
-        world_coords_7_points = convert_to_world_coords_torch(boxes)
         boxes = boxes.to(points.device).expand(n_points, n_boxes, 12) 
         points = points.unsqueeze(1).expand(n_points, n_boxes, 3)
 
@@ -419,12 +413,8 @@ class TR3DAssigner:
         level_condition = label_levels == point_levels
 
         # condition 2: keep topk location per box by center distance
-        # center = boxes[..., :3] # n_points, n_boxes, 3
+        center = boxes[..., :3] # n_points, n_boxes, 3
         
-        #######################################################################
-        # getting center from canonical coords
-        center = world_coords_7_points[:, :1, :].squeeze(1).to(points.device).expand(n_points, n_boxes, 3)
-        ###########################
         center_distances = torch.sum(torch.pow(center - points, 2), dim=-1) # sum of square of distances of points from center 
         center_distances = torch.where(level_condition, center_distances, float_max) #where the label levels and point levels match, calulate this distance
         topk_distances = torch.topk(center_distances,

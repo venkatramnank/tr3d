@@ -45,7 +45,7 @@ resume_from = None
 workflow = [('train', 1)]
 
 dataset_type = 'PhysionDataset'
-data_root = '/home/kalyanav/MS_thesis/tr3d_data/physion/'
+data_root = '/home/kalyanav/MS_thesis/tr3d_data/physion_center_ortho_dominoes/'
 # class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
 train_pipeline = [

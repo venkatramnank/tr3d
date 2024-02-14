@@ -366,8 +366,7 @@ class PhysionPointCloudGenerator:
 
 class PointCloudVisualizer:
     def __init__(self):
-        self.vis = o3d.visualization.Visualizer()
-        self.vis.create_window()
+        self.vis = None
 
     def create_point_cloud(self, points, color, corners=None, center = None):
         
@@ -421,7 +420,7 @@ class PointCloudVisualizer:
             # bbox = mesh.get_oriented_bounding_box()
             lines = [[0, 1], [1, 3], [2, 3], [2, 0],
              [4, 5], [5, 7], [6, 7], [6, 4],
-             [1, 7], [0, 6], [2, 4], [3, 5]]
+             [1, 5], [0, 4], [2, 6], [3, 7]]
 
             lineset = o3d.geometry.LineSet()
             lineset.points = o3d.utility.Vector3dVector(bbox_points)
@@ -433,9 +432,14 @@ class PointCloudVisualizer:
             bbox = o3d.geometry.OrientedBoundingBox(center=center, R=np.eye(3, 3), extent=dimensions)
         return bbox
 
-    def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, center = None, corners=None, bbox_points_list=None, use_points=False):
+    def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, center = None, corners=None, bbox_points_list=None, use_points=False, save = False, output_dir = None,scene_name=None, show=False):
+        
+        if show: 
+            self.vis = o3d.visualization.Visualizer()
+            self.vis.create_window()
         pcd = self.create_point_cloud(points[:, :3], color = points[:, 3:], corners = corners, center = center)
-        self.vis.add_geometry(pcd)
+        if show: self.vis.add_geometry(pcd)
+        bbox_lineset = []
 
         for gt_bbox_info in (gt_bboxes_list):
             # if bbox_points:
@@ -480,14 +484,39 @@ class PointCloudVisualizer:
             else:
                 print("Error in dimension of input, unable to visualize")
                 exit()
-            self.vis.add_geometry(bbox)
+            if show: self.vis.add_geometry(bbox)
+            bbox_lineset.append(bbox)
+           
+        if save:
+            os.makedirs(output_dir, exist_ok=True)
+            scene_dir = os.path.join(output_dir, scene_name)
+            os.makedirs(scene_dir, exist_ok=True)
 
-        self.vis.get_view_control().set_front([0, 0, -1])
-        self.vis.get_view_control().set_up([0, -1, 0])
-        self.vis.get_view_control().set_lookat([1, 1, 1])
+            # Save the point cloud as PLY
+            pcd_file = os.path.join(scene_dir, f"{scene_name}_pcd.ply")
+            o3d.io.write_point_cloud(pcd_file, pcd)
 
-        self.vis.run()
-        self.vis.destroy_window()
+            print(f"Point cloud saved to {pcd_file}")
+
+            # Save each bounding box separately
+            bbox_id = 0
+            for bbox in bbox_lineset:
+                # Adjust the file extension based on the bbox type
+                file_ext = "ply" 
+                bbox_file = os.path.join(scene_dir, f"{scene_name}_bbox_{bbox_id}_lineset.{file_ext}")
+                o3d.io.write_line_set(bbox_file, bbox)
+                print(f"Bbox {bbox_id} saved to {bbox_file}")
+                bbox_id += 1
+
+            print(f"Visualization saved to {scene_dir}")
+
+        
+        if show:
+            self.vis.get_view_control().set_front([0, 0, -1])
+            self.vis.get_view_control().set_up([0, -1, 0])
+            self.vis.get_view_control().set_lookat([1, 1, 1])
+            self.vis.run()
+            self.vis.destroy_window()
 
 
 #TODO: need to write properties for canonical space to world coordinates and vice versa in terms of utils
@@ -597,32 +626,30 @@ def bbox_to_corners(bbox):
     Returns:
         Tensor: Corners (including the center) of shape (N, 8, 3)
     """
+
     if bbox.shape[-1] != 12:
         return bbox
     
     if bbox.numel() == 0:
         return torch.empty([0, 8, 3], device=bbox.device)
-    
+    center = bbox[:, :3]
     dims = bbox[:, 3:6]
     corners_norm = torch.stack([
-        torch.Tensor([-0.5, 0, -0.5]),
-        torch.Tensor([-0.5, 1, -0.5]),
-        torch.Tensor([-0.5, 0, 0.5]),
-        torch.Tensor([-0.5, 1, 0.5]),
-        torch.Tensor([0.5, 0, 0.5]),
-        torch.Tensor([0.5, 1, 0.5]),
-        torch.Tensor([0.5, 0, -0.5]),
-        torch.Tensor([0.5, 1, -0.5])            
+        torch.Tensor([0.5, 0.5, 0.5]),
+        torch.Tensor([0.5, 0.5, -0.5]),
+        torch.Tensor([0.5, -0.5, 0.5]),
+        torch.Tensor([0.5, -0.5, -0.5]),
+        torch.Tensor([-0.5, 0.5, 0.5]),
+        torch.Tensor( [-0.5, 0.5, -0.5]),
+        torch.Tensor([-0.5, -0.5, 0.5]),
+        torch.Tensor([-0.5, -0.5, -0.5])            
     ]).to(device=dims.device, dtype=dims.dtype)
     
     corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
-    if torch.all(bbox[:, 6:]== 0):
-        rotation_matrix = torch.eye(3)
-    else:
-        rotation_matrix = compute_rotation_matrix_from_ortho6d(bbox[:, 6:])
+    rotation_matrix = compute_rotation_matrix_from_ortho6d(bbox[:, 6:])
     corners = rotation_matrix@corners.transpose(1,2)
     corners = corners.permute(0,2,1) 
-    corners += bbox[:, :3].view(-1, 1, 3)
+    corners += center.view(-1, 1, 3)
     """
     #NOTE: Enable gradient tracking
     corners.requires_grad_(True)

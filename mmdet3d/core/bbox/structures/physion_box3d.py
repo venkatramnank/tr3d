@@ -72,68 +72,68 @@ class Physion3DBoxes(object):
     
     
     
-    @property 
-    def corners(self):
-        """torch.Tensor: Coordinates of corners of all the boxes
-        in shape (N, 8, 3).
+    # @property 
+    # def corners(self):
+    #     """torch.Tensor: Coordinates of corners of all the boxes
+    #     in shape (N, 8, 3).
 
-        Convert the boxes to corners in clockwise order, in form of
-        ``(x0y0z0, x0y0z1, x0y1z1, x0y1z0, x1y0z0, x1y0z1, x1y1z1, x1y1z0)``
+    #     Convert the boxes to corners in clockwise order, in form of
+    #     ``(x0y0z0, x0y0z1, x0y1z1, x0y1z0, x1y0z0, x1y0z1, x1y1z1, x1y1z0)``
 
-        .. code-block:: none
+    #     .. code-block:: none
 
-                                           up z
-                            front y           ^
-                                 /            |
-                                /             |
-                  (x0, y1, z1) + -----------  + (x1, y1, z1)
-                              /|            / |
-                             / |           /  |
-               (x0, y0, z1) + ----------- +   + (x1, y1, z0)
-                            |  /      .   |  /
-                            | / origin    | /
-               (x0, y0, z0) + ----------- + --------> right x
-                                          (x1, y0, z0)
-        """
-        if self.tensor.numel() == 0:
-            return torch.empty([0, 8, 3], device=self.tensor.device)
-        dims = self.tensor[:, 3:6]
+    #                                        up z
+    #                         front y           ^
+    #                              /            |
+    #                             /             |
+    #               (x0, y1, z1) + -----------  + (x1, y1, z1)
+    #                           /|            / |
+    #                          / |           /  |
+    #            (x0, y0, z1) + ----------- +   + (x1, y1, z0)
+    #                         |  /      .   |  /
+    #                         | / origin    | /
+    #            (x0, y0, z0) + ----------- + --------> right x
+    #                                       (x1, y0, z0)
+    #     """
+    #     if self.tensor.numel() == 0:
+    #         return torch.empty([0, 8, 3], device=self.tensor.device)
+    #     dims = self.tensor[:, 3:6]
         
-        """corners
-        the coordinate system is [x,z,y],
-        with center being [0, 0.5, 0],
+    #     """corners
+    #     the coordinate system is [x,z,y],
+    #     with center being [0, 0.5, 0],
 
         
-        Then we multiply the scale in the form of [x,z,y] to get the cuboids, Then apply rotation and translation.
-        """
-        corners_norm = torch.stack([
-            torch.Tensor([-0.5, 0, -0.5]),
-            torch.Tensor([-0.5, 1, -0.5]),
-            torch.Tensor([-0.5, 0, 0.5]),
-            torch.Tensor([-0.5, 1, 0.5]),
-            torch.Tensor([0.5, 0, 0.5]),
-            torch.Tensor([0.5, 1, 0.5]),
-            torch.Tensor([0.5, 0, -0.5]),
-            torch.Tensor([0.5, 1, -0.5])            
-        ]).to(device=dims.device, dtype=dims.dtype)
-        # corners_norm = torch.from_numpy(
-        #     np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)).to(
-        #         device=dims.device, dtype=dims.dtype)
+    #     Then we multiply the scale in the form of [x,z,y] to get the cuboids, Then apply rotation and translation.
+    #     """
+    #     corners_norm = torch.stack([
+    #         torch.Tensor([-0.5, 0, -0.5]),
+    #         torch.Tensor([-0.5, 1, -0.5]),
+    #         torch.Tensor([-0.5, 0, 0.5]),
+    #         torch.Tensor([-0.5, 1, 0.5]),
+    #         torch.Tensor([0.5, 0, 0.5]),
+    #         torch.Tensor([0.5, 1, 0.5]),
+    #         torch.Tensor([0.5, 0, -0.5]),
+    #         torch.Tensor([0.5, 1, -0.5])            
+    #     ]).to(device=dims.device, dtype=dims.dtype)
+    #     # corners_norm = torch.from_numpy(
+    #     #     np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)).to(
+    #     #         device=dims.device, dtype=dims.dtype)
 
-        # corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
+    #     # corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
         
 
-        # use relative origin (0.5, 0.5, 0.5)
-        # corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0.5])
-        corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
+    #     # use relative origin (0.5, 0.5, 0.5)
+    #     # corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0.5])
+    #     corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
 
-        corners = self.rotation_matrix@corners.transpose(1,2)
-        corners = corners.permute(0,2,1) 
-        corners += self.tensor[:, :3].view(-1, 1, 3)
-        return corners
+    #     corners = self.rotation_matrix@corners.transpose(1,2)
+    #     corners = corners.permute(0,2,1) 
+    #     corners += self.bottom_center.view(-1, 1, 3)
+    #     return corners
     
     @property 
-    def corners_using_center(self):
+    def corners(self):
         """torch.Tensor: Coordinates of corners of all the boxes
         in shape (N, 8, 3).
 
@@ -253,9 +253,7 @@ class Physion3DBoxes(object):
     def bottom_center(self):
         """torch.Tensor: A tensor with center of each box in shape (N, 3)."""
         # TODO: Need to build canonical to world
-        world_points =  torch.matmul(self.rotation_matrix, torch.matmul(torch.diag_embed(self.tensor[:, 3:6]), torch.Tensor([0, 0.5, 0]).repeat(self.tensor.shape[0],1).unsqueeze(2))) + self.tensor[:, :3].unsqueeze(2)
-        # world_points = canonical_to_world(torch.Tensor([0, 0.5, 0]).repeat(self.tensor.shape[0],1), self.rotation_matrix, self.tensor[:, :3], self.tensor[:, 3:6])
-        return world_points.squeeze(2)
+        return self.tensor[:, :3]
     
     @property
     def center(self):
