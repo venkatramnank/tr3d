@@ -493,29 +493,31 @@ class PointCloudVisualizer:
             os.makedirs(scene_dir, exist_ok=True)
 
             # Save the point cloud as PLY
-            pcd_file = os.path.join(scene_dir, f"{scene_name}_pcd.ply")
+            pcd_file = os.path.join(scene_dir, f"{scene_name}_pcd.pcd")
             o3d.io.write_point_cloud(pcd_file, pcd)
 
             print(f"Point cloud saved to {pcd_file}")
 
-            # Save each bounding box separately
-            bbox_id = 0
-            for bbox in bbox_lineset:
-                # Adjust the file extension based on the bbox type
-                file_ext = "ply" 
-                bbox_file = os.path.join(scene_dir, f"{scene_name}_bbox_{bbox_id}_lineset.{file_ext}")
-                o3d.io.write_line_set(bbox_file, bbox)
-                print(f"Bbox {bbox_id} saved to {bbox_file}")
-                bbox_id += 1
+            # Save each bounding box information
+            bbox_file_path = os.path.join(scene_dir, f"{scene_name}_bbox_list.npy")
+            np.save(bbox_file_path, np.array(gt_bboxes_list))
 
             print(f"Visualization saved to {scene_dir}")
 
         
         if show:
-            self.vis.get_view_control().set_front([0, 0, -1])
-            self.vis.get_view_control().set_up([0, -1, 0])
-            self.vis.get_view_control().set_lookat([1, 1, 1])
-            self.vis.run()
+            os.makedirs(output_dir, exist_ok=True)
+            scene_dir = os.path.join(output_dir, scene_name)
+            os.makedirs(scene_dir, exist_ok=True)
+            # self.vis.get_view_control().set_front([0, 0, -1])
+            # self.vis.get_view_control().set_up([0, -1, 0])
+            # self.vis.get_view_control().set_lookat([1, 1, 1])
+            
+            # self.vis.update_geometry()
+            self.vis.poll_events()
+            self.vis.update_renderer()
+            # self.vis.run()
+            self.vis.capture_screen_image(os.path.join(scene_dir, f"{scene_name}_image.png"))
             self.vis.destroy_window()
 
 
