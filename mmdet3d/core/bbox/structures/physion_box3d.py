@@ -188,7 +188,7 @@ class Physion3DBoxes(object):
 
         corners = self.rotation_matrix@corners.transpose(1,2)
         corners = corners.permute(0,2,1) 
-        corners += self.bottom_center.view(-1, 1, 3)
+        corners += self.tensor[:, :3].view(-1, 1, 3)
         return corners
     
     

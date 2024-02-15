@@ -47,7 +47,7 @@ def bbox3d2roi(bbox_list):
     return rois
 
 
-def bbox3d2result(bboxes, scores, labels, points, attrs=None):
+def bbox3d2result(bboxes, scores, labels, boxes_corners, attrs=None):
     """Convert detection results to a list of numpy arrays.
 
     Args:
@@ -69,7 +69,7 @@ def bbox3d2result(bboxes, scores, labels, points, attrs=None):
         boxes_3d=bboxes.to('cpu'),
         scores_3d=scores.cpu(),
         labels_3d=labels.cpu(),
-        points= points.cpu())
+        boxes_corners= boxes_corners.cpu())
 
     if attrs is not None:
         result_dict['attrs_3d'] = attrs.cpu()

@@ -506,18 +506,18 @@ class PointCloudVisualizer:
 
         
         if show:
-            os.makedirs(output_dir, exist_ok=True)
-            scene_dir = os.path.join(output_dir, scene_name)
-            os.makedirs(scene_dir, exist_ok=True)
+            # os.makedirs(output_dir, exist_ok=True)
+            # scene_dir = os.path.join(output_dir, scene_name)
+            # os.makedirs(scene_dir, exist_ok=True)
             # self.vis.get_view_control().set_front([0, 0, -1])
             # self.vis.get_view_control().set_up([0, -1, 0])
             # self.vis.get_view_control().set_lookat([1, 1, 1])
             
             # self.vis.update_geometry()
-            self.vis.poll_events()
-            self.vis.update_renderer()
-            # self.vis.run()
-            self.vis.capture_screen_image(os.path.join(scene_dir, f"{scene_name}_image.png"))
+            # self.vis.poll_events()
+            # self.vis.update_renderer()
+            self.vis.run()
+            # self.vis.capture_screen_image(os.path.join(scene_dir, f"{scene_name}_image.png"))
             self.vis.destroy_window()
 
 

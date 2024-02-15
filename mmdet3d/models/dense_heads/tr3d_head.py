@@ -86,7 +86,7 @@ class TR3DHead(BaseModule):
 
     
     @staticmethod
-    def bbox_to_corners(bbox):
+    def bbox_to_corners(bbox, pos_points=None):
         """Converts the center, h,w,l,ortho6d format into corners
 
         Args:
@@ -102,6 +102,10 @@ class TR3DHead(BaseModule):
         if bbox.numel() == 0:
             return torch.empty([0, 8, 3], device=bbox.device)
         center = bbox[:, :3]
+        if pos_points is not None:
+            center[:, :0] = center[:, :0] + pos_points[:, :0]
+            center[:, :1] = center[:, :1] + pos_points[:, :1]
+            center[:, :2] = center[:, :2] + pos_points[:, :2]
         dims = bbox[:, 3:6]
         corners_norm = torch.stack([
             torch.Tensor([0.5, 0.5, 0.5]),
@@ -218,12 +222,12 @@ class TR3DHead(BaseModule):
         if pos_mask.sum() > 0:
             pos_points = points[pos_mask]
             pos_bbox_preds = bbox_preds[pos_mask]
-            bbox_targets = torch.cat((gt_bboxes.tensor[:, :3], gt_bboxes.tensor[:, 3:]), dim=1)
+            bbox_targets = torch.cat((gt_bboxes.tensor[:,:3], gt_bboxes.tensor[:, 3:]), dim=1)
             pos_bbox_targets = bbox_targets.to(points.device)[assigned_ids][pos_mask]
 
 
-            if pos_bbox_preds.shape[1] == 6:
-                pos_bbox_targets = pos_bbox_targets[:, :6]
+            # if pos_bbox_preds.shape[1] == 6:
+            #     pos_bbox_targets = pos_bbox_targets[:, :6]
 
             # bbox_loss = self.bbox_loss(
             #     self._bbox_to_loss(
@@ -233,8 +237,10 @@ class TR3DHead(BaseModule):
             #     self.bbox_to_corners(pos_bbox_preds) + pos_points.unsqueeze(1) , #TODO: test with the second term here
             #     self.bbox_to_corners(pos_bbox_targets)
             # )
+            import pdb; pdb.set_trace()
+            # pos_bbox_preds[:, :3] = pos_bbox_preds[:, :3] + pos_points
             bbox_loss = self.bbox_loss(
-            self.bbox_to_corners(pos_bbox_preds) + pos_points.unsqueeze(1),
+            self.bbox_to_corners(pos_bbox_preds, pos_points),
             self.bbox_to_corners(pos_bbox_targets) 
             )            
             # iou(self.bbox_to_corners(pos_bbox_preds),
@@ -265,6 +271,7 @@ class TR3DHead(BaseModule):
 
     def forward_train(self, x, gt_bboxes, gt_labels, img_metas):
         bbox_preds, cls_preds, points = self(x)
+        import pdb; pdb.set_trace()
         return self._loss(bbox_preds, cls_preds, points,
                           gt_bboxes, gt_labels, img_metas)
 
@@ -337,6 +344,7 @@ class TR3DHead(BaseModule):
         max_scores, _ = scores.max(dim=1)
         labels = []
         n_classes = scores.shape[1]
+        print(points)
         for i in range(n_classes):
             labels.append(
                 bbox_preds.new_full(
@@ -347,9 +355,11 @@ class TR3DHead(BaseModule):
         #     bbox_preds = bbox_preds[ids]
         #     scores = scores[ids]
         #     points = points[ids]
-
+        
         # boxes = self._bbox_pred_to_bbox(points, bbox_preds)
-        boxes_corners = self.bbox_to_corners(bbox_preds)
+        
+        
+        boxes_corners = self.bbox_to_corners(bbox_preds, points)
         
         #TODO: Need to fix NMS for 3d
         # import pdb; pdb.set_trace()
@@ -359,7 +369,7 @@ class TR3DHead(BaseModule):
             bbox_preds,
             box_dim=12,
             with_ortho6d=True)
-        return bbox_preds, scores, labels, points
+        return bbox_preds, scores, labels, boxes_corners
 
     def _get_bboxes(self, bbox_preds, cls_preds, points, img_metas):
         results = []
@@ -411,7 +421,7 @@ class TR3DAssigner:
         label_levels = label2level[gt_labels].unsqueeze(0).expand(n_points, n_boxes) # in our case all 1s
         point_levels = torch.unsqueeze(levels, 1).expand(n_points, n_boxes) 
         level_condition = label_levels == point_levels
-
+        
         # condition 2: keep topk location per box by center distance
         center = boxes[..., :3] # n_points, n_boxes, 3
         
