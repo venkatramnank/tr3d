@@ -123,7 +123,7 @@ class Base3DDetector(BaseDetector):
             
             # pred_corners = (bbox_to_corners(pred_bboxes.tensor) + points_mink.unsqueeze(1)).cpu().numpy()
             pred_bboxes = pred_bboxes.tensor.cpu().numpy()
-
+            
             show_result_physion(
                 points,
                 gt_bbox,

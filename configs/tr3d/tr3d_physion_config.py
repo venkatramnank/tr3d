@@ -18,7 +18,7 @@ model = dict(
         assigner=dict(
             type='TR3DAssigner',
             top_pts_threshold=6,
-            label2level=[1]),
+            label2level=[0]),
         bbox_loss=dict(type='CornerBoundingBoxLoss')),
     train_cfg=dict(),
     test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.01))
@@ -27,7 +27,7 @@ optimizer = dict(type='AdamW', lr=.001, weight_decay=.0001)
 # optimizer = dict(type='SGD', lr=.001, weight_decay=.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=10, norm_type=2))
 lr_config = dict(policy='step', warmup=None, step=[8, 11])
-runner = dict(type='EpochBasedRunner', max_epochs=12)
+runner = dict(type='EpochBasedRunner', max_epochs=20)
 custom_hooks = [dict(type='EmptyCacheHook', after_iter=True)]
 
 checkpoint_config = dict(interval=1, max_keep_ckpts=1)
@@ -124,7 +124,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'train.pkl',
+        ann_file=data_root + 'val.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,

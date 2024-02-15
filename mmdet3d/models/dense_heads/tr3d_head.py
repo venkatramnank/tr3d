@@ -237,7 +237,6 @@ class TR3DHead(BaseModule):
             #     self.bbox_to_corners(pos_bbox_preds) + pos_points.unsqueeze(1) , #TODO: test with the second term here
             #     self.bbox_to_corners(pos_bbox_targets)
             # )
-            import pdb; pdb.set_trace()
             # pos_bbox_preds[:, :3] = pos_bbox_preds[:, :3] + pos_points
             bbox_loss = self.bbox_loss(
             self.bbox_to_corners(pos_bbox_preds, pos_points),
@@ -246,6 +245,7 @@ class TR3DHead(BaseModule):
             # iou(self.bbox_to_corners(pos_bbox_preds),
             #     self.bbox_to_corners(pos_bbox_targets))           
         else:
+            import pdb; pdb.set_trace()
             bbox_loss = None
         
         return bbox_loss, cls_loss, pos_mask
@@ -271,7 +271,6 @@ class TR3DHead(BaseModule):
 
     def forward_train(self, x, gt_bboxes, gt_labels, img_metas):
         bbox_preds, cls_preds, points = self(x)
-        import pdb; pdb.set_trace()
         return self._loss(bbox_preds, cls_preds, points,
                           gt_bboxes, gt_labels, img_metas)
 
@@ -344,7 +343,6 @@ class TR3DHead(BaseModule):
         max_scores, _ = scores.max(dim=1)
         labels = []
         n_classes = scores.shape[1]
-        print(points)
         for i in range(n_classes):
             labels.append(
                 bbox_preds.new_full(
@@ -358,7 +356,7 @@ class TR3DHead(BaseModule):
         
         # boxes = self._bbox_pred_to_bbox(points, bbox_preds)
         
-        
+        print(points)
         boxes_corners = self.bbox_to_corners(bbox_preds, points)
         
         #TODO: Need to fix NMS for 3d
@@ -420,6 +418,7 @@ class TR3DAssigner:
         label2level = gt_labels.new_tensor(self.label2level)
         label_levels = label2level[gt_labels].unsqueeze(0).expand(n_points, n_boxes) # in our case all 1s
         point_levels = torch.unsqueeze(levels, 1).expand(n_points, n_boxes) 
+        import pdb; pdb.set_trace()
         level_condition = label_levels == point_levels
         
         # condition 2: keep topk location per box by center distance
@@ -427,9 +426,11 @@ class TR3DAssigner:
         
         center_distances = torch.sum(torch.pow(center - points, 2), dim=-1) # sum of square of distances of points from center 
         center_distances = torch.where(level_condition, center_distances, float_max) #where the label levels and point levels match, calulate this distance
+        
         topk_distances = torch.topk(center_distances,
                                     min(self.top_pts_threshold + 1, len(center_distances)),
                                     largest=False, dim=0).values[-1] # k = min(number of points, top pts threshold)
+        
         topk_condition = center_distances < topk_distances.unsqueeze(0) # wherever the center distances is less that topk distances
 
         # condition 3.0: only closest object to point

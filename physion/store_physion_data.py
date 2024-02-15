@@ -393,6 +393,7 @@ def get_phys_dict(img_idx, _file,_file_idx,  filename, frame_id):
         seg_numpy_arr = np.array(image)
         seg_mask = (seg_numpy_arr == seg_color).all(-1)
         seg_mask = seg_mask.astype(np.uint8)
+        
         if not np.any(seg_mask):
             # NOTE: Some error in data for pilot_dominoes_0mid_d3chairs_o1plants_tdwroom_0001.hdf5, final seg mask empty
             warnings.warn('Missing segmentation mask for file: ' + filename + " at frame: " + frame_id) 
@@ -525,7 +526,7 @@ if __name__ == "__main__":
     data_infos = []
     img_idx = 0
     start = 50
-    frames_per_vid = 40
+    frames_per_vid = 10
     for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
         if 'dominoes' in _file: #TODO use dominoes only or 'collision' in _file
             for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
@@ -539,7 +540,8 @@ if __name__ == "__main__":
                                 print(filename, frame_id)
                                 print("img_idx: ",img_idx)
                                 img_idx += 1
-                                data_infos.append(phys_dict)
+                                if phys_dict['annos']['gt_boxes_upright_depth'].size != 0:
+                                    data_infos.append(phys_dict)
                     except OSError:
                         continue
     print("Storing {} pickle file ....".format(SPLIT) )

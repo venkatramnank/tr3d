@@ -69,6 +69,7 @@ class MinkSingleStage3DDetector(Base3DDetector):
         points = [p[voxelize(p[:, :3], self.voxel_size)] for p in points]  # [65536 x 6] [] [] ... b #TODO: visualize it once
         # import pdb; pdb.set_trace()
         # visualizer = PointCloudVisualizer()
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
         # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes[0].tensor.cpu().numpy())
         # coordinates, features = ME.utils.batch_sparse_collate(
         #     [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
