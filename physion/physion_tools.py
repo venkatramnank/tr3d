@@ -366,8 +366,7 @@ class PhysionPointCloudGenerator:
 
 class PointCloudVisualizer:
     def __init__(self):
-        self.vis = o3d.visualization.Visualizer()
-        self.vis.create_window()
+        self.vis = None
 
     def create_point_cloud(self, points, color, corners=None, center = None):
         if corners is not None:
@@ -432,10 +431,14 @@ class PointCloudVisualizer:
             bbox = o3d.geometry.OrientedBoundingBox(center=center, R=np.eye(3, 3), extent=dimensions)
         return bbox
 
-    def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, center = None, corners=None, bbox_points_list=None, use_points=False):
-        
+    def visualize_point_cloud_and_bboxes(self, points, gt_bboxes_list, center = None, corners=None, bbox_points_list=None, use_points=False, save = False, output_dir = None,scene_name=None, show=False):
+                
+        if show: 
+            self.vis = o3d.visualization.Visualizer()
+            self.vis.create_window()
         pcd = self.create_point_cloud(points[:, :3], color = points[:, 3:], corners = corners, center = center)
-        self.vis.add_geometry(pcd)
+        if show: self.vis.add_geometry(pcd)
+        bbox_lineset = []
 
         for gt_bbox_info in (gt_bboxes_list):
             # if bbox_points:
@@ -480,14 +483,41 @@ class PointCloudVisualizer:
             else:
                 print("Error in dimension of input, unable to visualize")
                 exit()
-            self.vis.add_geometry(bbox)
+            if show: self.vis.add_geometry(bbox)
+            bbox_lineset.append(bbox)
+           
+        if save:
+            os.makedirs(output_dir, exist_ok=True)
+            scene_dir = os.path.join(output_dir, scene_name)
+            os.makedirs(scene_dir, exist_ok=True)
 
-        self.vis.get_view_control().set_front([0, 0, -1])
-        self.vis.get_view_control().set_up([0, -1, 0])
-        self.vis.get_view_control().set_lookat([1, 1, 1])
+            # Save the point cloud as PLY
+            pcd_file = os.path.join(scene_dir, f"{scene_name}_pcd.pcd")
+            o3d.io.write_point_cloud(pcd_file, pcd)
 
-        self.vis.run()
-        self.vis.destroy_window()
+            print(f"Point cloud saved to {pcd_file}")
+
+            # Save each bounding box information
+            bbox_file_path = os.path.join(scene_dir, f"{scene_name}_bbox_list.npy")
+            np.save(bbox_file_path, np.array(gt_bboxes_list))
+
+            print(f"Visualization saved to {scene_dir}")
+
+        
+        if show:
+            os.makedirs(output_dir, exist_ok=True)
+            scene_dir = os.path.join(output_dir, scene_name)
+            os.makedirs(scene_dir, exist_ok=True)
+            # self.vis.get_view_control().set_front([0, 0, -1])
+            # self.vis.get_view_control().set_up([0, -1, 0])
+            # self.vis.get_view_control().set_lookat([1, 1, 1])
+            
+            # self.vis.update_geometry()
+            self.vis.poll_events()
+            self.vis.update_renderer()
+            # self.vis.run()
+            self.vis.capture_screen_image(os.path.join(scene_dir, f"{scene_name}_image.png"))
+            self.vis.destroy_window()
 
 
 #TODO: need to write properties for canonical space to world coordinates and vice versa in terms of utils

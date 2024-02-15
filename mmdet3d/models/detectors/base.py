@@ -75,7 +75,7 @@ class Base3DDetector(BaseDetector):
             score_thr (float, optional): Score threshold of bounding boxes.
                 Default to None.
         """
-        import pdb;pdb.set_trace()
+
         for batch_id in range(len(result)):
             if isinstance(data['points'][0], DC):
                 points = data['points'][0]._data[0][batch_id].numpy()

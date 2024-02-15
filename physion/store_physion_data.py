@@ -516,18 +516,18 @@ if __name__ == "__main__":
     args = parse_args()
     SPLIT = args.split
     PHYSION_HDF5_ROOT = "/home/kalyanav/MS_thesis/tr3d_data/physion/HDF5/" + f"{SPLIT}"
-    PREV_PKL_FILE_PATH = "/home/kalyanav/MS_thesis/tr3d_data/physion" + f"/{SPLIT}.pkl"
-    OBJ_TYPE_LIST_PATH = "/home/kalyanav/MS_thesis/r3d_data/physion" + f"/{SPLIT}.txt"
+    PREV_PKL_FILE_PATH = "/home/kalyanav/MS_thesis/tr3d_data/physion_dominoes_12d" + f"/{SPLIT}.pkl"
+    OBJ_TYPE_LIST_PATH = "/home/kalyanav/MS_thesis/r3d_data/physion_dominoes_12d" + f"/{SPLIT}.txt"
 
     # PHYSION_RGB_PATH = "/home/kashis/Desktop/Eval7/tr3d/physion"
 
-    STORE_PATH_ROOT = "/home/kalyanav/MS_thesis/tr3d_data/physion"
+    STORE_PATH_ROOT = "/home/kalyanav/MS_thesis/tr3d_data/physion_dominoes_12d"
     data_infos = []
     img_idx = 0
     start = 50
-    frames_per_vid = 20
+    frames_per_vid = 40
     for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
-        if 'dominoes' in _file or 'collision' in _file: #TODO use dominoes only or 'collision' in _file
+        if 'dominoes' in _file: #TODO use dominoes only or 'collision' in _file
             for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
                 if os.path.join(PHYSION_HDF5_ROOT, _file, filename).endswith('hdf5'):
                     vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, _file, filename)
