@@ -344,11 +344,13 @@ class TR3DHead(BaseModule):
                 bbox_preds.new_full(
                     scores.shape, i, dtype=torch.long))
         labels = torch.cat(labels, dim=0)
+
         # if len(scores) > self.test_cfg.nms_pre > 0:
         #     _, ids = max_scores.topk(self.test_cfg.nms_pre)
         #     bbox_preds = bbox_preds[ids]
         #     scores = scores[ids]
         #     points = points[ids]
+        #     labels = labels[ids]
         
         # boxes = self._bbox_pred_to_bbox(points, bbox_preds)
         

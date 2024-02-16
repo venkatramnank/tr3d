@@ -102,7 +102,7 @@ class Base3DDetector(BaseDetector):
             pred_bboxes = result[batch_id]['boxes_3d']
             pred_labels = result[batch_id]['labels_3d']
             boxes_corners = result[batch_id]['boxes_corners']
-            # import pdb; pdb.set_trace()
+
             if score_thr is not None:
                 mask = result[batch_id]['scores_3d'] > score_thr
                 # pred_bboxes = pred_bboxes[mask]

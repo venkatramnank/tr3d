@@ -55,7 +55,7 @@ class MinkSingleStage3DDetector(Base3DDetector):
     def extract_feat(self, *args):
         """Just implement @abstractmethod of BaseModule."""
 
-    def extract_feats(self, points, gt_bboxes_3d):
+    def extract_feats(self, points):
         """Extract features from points.
 
         Args:
@@ -67,9 +67,9 @@ class MinkSingleStage3DDetector(Base3DDetector):
        # voxelization with voxel size of 0.05 
         
         points = [p[voxelize(p[:, :3], self.voxel_size)] for p in points]  # [65536 x 6] [] [] ... b #TODO: visualize it once
-        import pdb; pdb.set_trace()
-        visualizer = PointCloudVisualizer()
-        visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
+        # import pdb; pdb.set_trace()
+        # visualizer = PointCloudVisualizer()
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
         # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes[0].tensor.cpu().numpy())
         # coordinates, features = ME.utils.batch_sparse_collate(
         #     [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
@@ -104,7 +104,7 @@ class MinkSingleStage3DDetector(Base3DDetector):
         # visualizer = PointCloudVisualizer()
         # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
         #####################################################################################
-        x = self.extract_feats(points, gt_bboxes_3d)
+        x = self.extract_feats(points)
         losses = self.head.forward_train(x, gt_bboxes_3d, gt_labels_3d,
                                          img_metas)
         return losses

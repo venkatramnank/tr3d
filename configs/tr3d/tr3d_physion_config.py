@@ -17,8 +17,8 @@ model = dict(
         voxel_size=voxel_size,
         assigner=dict(
             type='TR3DAssigner',
-            top_pts_threshold=6,
-            label2level=[0]),
+            top_pts_threshold=8,
+            label2level=[1]),
         bbox_loss=dict(type='CornerBoundingBoxLoss')),
     train_cfg=dict(),
     test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.01))
@@ -83,7 +83,7 @@ test_pipeline = [
         use_dim=[0, 1, 2, 3, 4, 5]),
     dict(
         type='MultiScaleFlipAug3D',
-        img_scale=(1333, 800),
+        img_scale=(256, 256),
         pts_scale_ratio=1,
         flip=False,
         transforms=[
