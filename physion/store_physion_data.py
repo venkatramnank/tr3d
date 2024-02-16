@@ -526,7 +526,7 @@ if __name__ == "__main__":
     data_infos = []
     img_idx = 0
     start = 50
-    frames_per_vid = 10
+    frames_per_vid = 15
     for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
         if 'dominoes' in _file: #TODO use dominoes only or 'collision' in _file
             for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):

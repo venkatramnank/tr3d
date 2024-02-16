@@ -123,6 +123,7 @@ class TR3DHead(BaseModule):
         corners = rotation_matrix@corners.transpose(1,2)
         corners = corners.permute(0,2,1) 
         corners += center.view(-1, 1, 3)
+        corners_center = torch.concat([corners, center.unsqueeze(1)], dim=1)
         """
         #NOTE: Enable gradient tracking
         corners.requires_grad_(True)
@@ -133,7 +134,7 @@ class TR3DHead(BaseModule):
         # Register the hook to the tensor
         corners.register_hook(hook_fn)
         """
-        return corners
+        return corners_center
     
     @staticmethod
     def _bbox_to_loss(bbox):
@@ -233,17 +234,12 @@ class TR3DHead(BaseModule):
             #     self._bbox_to_loss(
             #         self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
             #     self._bbox_to_loss(pos_bbox_targets)) 
-            # bbox_loss = self.bbox_loss(
-            #     self.bbox_to_corners(pos_bbox_preds) + pos_points.unsqueeze(1) , #TODO: test with the second term here
-            #     self.bbox_to_corners(pos_bbox_targets)
-            # )
-            # pos_bbox_preds[:, :3] = pos_bbox_preds[:, :3] + pos_points
+            # print(points)
             bbox_loss = self.bbox_loss(
             self.bbox_to_corners(pos_bbox_preds, pos_points),
             self.bbox_to_corners(pos_bbox_targets) 
             )            
-            # iou(self.bbox_to_corners(pos_bbox_preds),
-            #     self.bbox_to_corners(pos_bbox_targets))           
+          
         else:
             import pdb; pdb.set_trace()
             bbox_loss = None
@@ -356,7 +352,7 @@ class TR3DHead(BaseModule):
         
         # boxes = self._bbox_pred_to_bbox(points, bbox_preds)
         
-        print(points)
+        # print(points)
         boxes_corners = self.bbox_to_corners(bbox_preds, points)
         
         #TODO: Need to fix NMS for 3d
@@ -418,7 +414,6 @@ class TR3DAssigner:
         label2level = gt_labels.new_tensor(self.label2level)
         label_levels = label2level[gt_labels].unsqueeze(0).expand(n_points, n_boxes) # in our case all 1s
         point_levels = torch.unsqueeze(levels, 1).expand(n_points, n_boxes) 
-        import pdb; pdb.set_trace()
         level_condition = label_levels == point_levels
         
         # condition 2: keep topk location per box by center distance
