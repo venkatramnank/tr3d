@@ -25,7 +25,7 @@ def visualize_from_files(input_dir):
     for gt_bbox_info in (bbox_list):
         lines = [[0, 1], [1, 3], [2, 3], [2, 0],
              [4, 5], [5, 7], [6, 7], [6, 4],
-             [1, 7], [0, 6], [2, 4], [3, 5]]
+             [1, 5], [0, 4], [2, 6], [3, 7]]
 
         lineset = o3d.geometry.LineSet()
         lineset.points = o3d.utility.Vector3dVector(gt_bbox_info)

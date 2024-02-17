@@ -103,9 +103,7 @@ class TR3DHead(BaseModule):
             return torch.empty([0, 8, 3], device=bbox.device)
         center = bbox[:, :3]
         if pos_points is not None:
-            center[:, :0] = center[:, :0] + pos_points[:, :0]
-            center[:, :1] = center[:, :1] + pos_points[:, :1]
-            center[:, :2] = center[:, :2] + pos_points[:, :2]
+            center += pos_points
         dims = bbox[:, 3:6]
         corners_norm = torch.stack([
             torch.Tensor([0.5, 0.5, 0.5]),
@@ -241,7 +239,6 @@ class TR3DHead(BaseModule):
             )            
           
         else:
-            import pdb; pdb.set_trace()
             bbox_loss = None
         
         return bbox_loss, cls_loss, pos_mask
