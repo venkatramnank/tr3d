@@ -99,7 +99,7 @@ class Base3DDetector(BaseDetector):
             file_name = osp.split(pts_filename)[-1].split('.')[0]
 
             assert out_dir is not None, 'Expect out_dir, got none.'
-            points_mink = result[batch_id]['points']
+            corners = result[batch_id]['corners']
             pred_bboxes = result[batch_id]['boxes_3d']
             pred_labels = result[batch_id]['labels_3d']
             # import pdb; pdb.set_trace()
@@ -108,7 +108,7 @@ class Base3DDetector(BaseDetector):
                 # pred_bboxes = pred_bboxes[mask]
                 pred_bboxes = pred_bboxes[(mask == True).nonzero(as_tuple=True)[0]]
                 pred_labels = pred_labels[mask]
-                points_mink = points_mink[(mask == True).nonzero(as_tuple=True)[0]]
+                corners = corners[(mask == True).nonzero(as_tuple=True)[0]]
 
             # for now we convert points and bbox into depth mode
             if (box_mode_3d == Box3DMode.CAM) or (box_mode_3d
@@ -121,7 +121,7 @@ class Base3DDetector(BaseDetector):
                 ValueError(
                     f'Unsupported box_mode_3d {box_mode_3d} for conversion!')
             
-            pred_corners = (bbox_to_corners(pred_bboxes.tensor) + points_mink.unsqueeze(1)).cpu().numpy()
+            # pred_corners = (bbox_to_corners(pred_bboxes.tensor) + points_mink.unsqueeze(1)).cpu().numpy()
             pred_bboxes = pred_bboxes.tensor.cpu().numpy()
             
             show_result_physion(
@@ -130,7 +130,7 @@ class Base3DDetector(BaseDetector):
                 pred_bboxes,
                 out_dir,
                 file_name,
-                pred_corners=pred_corners,
+                pred_corners=corners.cpu().numpy(),
                 gt_corners=bbox_to_corners(torch.from_numpy(gt_bbox)).cpu().numpy(),
                 show=show, #TODO need to set this to show
                 pred_labels=pred_labels)

@@ -86,7 +86,7 @@ class TR3DHead(BaseModule):
 
     
     @staticmethod
-    def bbox_to_corners(bbox):
+    def bbox_to_corners(bbox, center=None, pos_points=None):
         """Converts the translation, scale,ortho6d format into corners
 
         Args:
@@ -118,6 +118,16 @@ class TR3DHead(BaseModule):
         corners = rotation_matrix@corners.transpose(1,2)
         corners = corners.permute(0,2,1) 
         corners += bbox[:, :3].view(-1, 1, 3)
+
+        if center is not None:
+            corners_center = torch.concat([corners, center], axis = 1)
+            if pos_points is not None:
+                corners_center += pos_points.unsqueeze(1)
+            return corners_center
+        else:
+            if pos_points is not None:
+                corners += pos_points.unsqueeze(1)
+            return corners
         """
         #NOTE: Enable gradient tracking
         corners.requires_grad_(True)
@@ -128,7 +138,7 @@ class TR3DHead(BaseModule):
         # Register the hook to the tensor
         corners.register_hook(hook_fn)
         """
-        return corners
+        
     
     @staticmethod
     def _bbox_to_loss(bbox):
@@ -219,11 +229,12 @@ class TR3DHead(BaseModule):
             pos_bbox_preds = bbox_preds[pos_mask]
             bbox_targets = torch.cat((gt_bboxes.tensor[:, :3], gt_bboxes.tensor[:, 3:]), dim=1)
             pos_bbox_targets = bbox_targets.to(points.device)[assigned_ids][pos_mask]
-            
+
             ######################################
             # getting the center of pred and gt and append to the 8 corners
             center_pos_bbox_preds = convert_to_world_coords_torch(pos_bbox_preds)[:, :1, :].to(points.device)
             center_pos_bbox_targets = convert_to_world_coords_torch(pos_bbox_targets)[:, :1, :].to(points.device)
+
             ######################################
 
             if pos_bbox_preds.shape[1] == 6:
@@ -237,9 +248,10 @@ class TR3DHead(BaseModule):
             #     self.bbox_to_corners(pos_bbox_preds) + pos_points.unsqueeze(1) , #TODO: test with the second term here
             #     self.bbox_to_corners(pos_bbox_targets)
             # )
+            
             bbox_loss = self.bbox_loss(
-            torch.concat((self.bbox_to_corners(pos_bbox_preds),center_pos_bbox_preds), dim=1) + pos_points.unsqueeze(1) ,
-            torch.concat((self.bbox_to_corners(pos_bbox_targets),center_pos_bbox_targets), dim=1) 
+            self.bbox_to_corners(pos_bbox_preds,pos_points=pos_points, center=center_pos_bbox_preds),
+            self.bbox_to_corners(pos_bbox_targets, center=center_pos_bbox_targets) 
             )            
             # iou(self.bbox_to_corners(pos_bbox_preds),
             #     self.bbox_to_corners(pos_bbox_targets))           
@@ -354,7 +366,7 @@ class TR3DHead(BaseModule):
 
         # boxes = self._bbox_pred_to_bbox(points, bbox_preds)
         
-        boxes_corners = self.bbox_to_corners(bbox_preds) 
+        boxes_corners = self.bbox_to_corners(bbox_preds, pos_points=points) 
         
         #TODO: Need to fix NMS for 3d
         # import pdb; pdb.set_trace()
@@ -364,7 +376,7 @@ class TR3DHead(BaseModule):
             bbox_preds,
             box_dim=12,
             with_ortho6d=True)
-        return bbox_preds, scores, labels, points
+        return bbox_preds, scores, labels, boxes_corners
 
     def _get_bboxes(self, bbox_preds, cls_preds, points, img_metas):
         results = []
