@@ -372,3 +372,16 @@ class Physion3DBoxes(object):
         original_type = type(self)
         return original_type(
             new_tensor, box_dim=self.box_dim, with_ortho6d=self.with_ortho6d)
+        
+        
+    def copy(self):
+        """Create a copy of the Physion3DBoxes object.
+
+        Returns:
+            Physion3DBoxes: A copy of the Physion3DBoxes object.
+        """
+        return Physion3DBoxes(
+            tensor=self.tensor.clone(),  # Assuming tensor is a torch.Tensor
+            box_dim=self.box_dim,
+            with_ortho6d=self.with_ortho6d
+        )

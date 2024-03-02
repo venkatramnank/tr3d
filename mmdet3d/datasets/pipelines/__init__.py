@@ -14,7 +14,7 @@ from .transforms_3d import (AffineResize, BackgroundPointsFilter,
                             ObjectNameFilter, ObjectNoise, ObjectRangeFilter,
                             ObjectSample, PointSample, PointShuffle,
                             PointsRangeFilter, RandomDropPointsColor,
-                            RandomFlip3D, RandomJitterPoints, RandomShiftScale,
+                            RandomFlip3D, RandomFlip3DPhysion, RandomJitterPoints, RandomShiftScale,
                             VoxelBasedPointSampler)
 
 __all__ = [
@@ -28,5 +28,5 @@ __all__ = [
     'VoxelBasedPointSampler', 'GlobalAlignment', 'IndoorPatchPointSample',
     'LoadImageFromFileMono3D', 'ObjectNameFilter', 'RandomDropPointsColor',
     'RandomJitterPoints', 'AffineResize', 'RandomShiftScale',
-    'LoadPointsFromDict'
+    'LoadPointsFromDict', 'RandomFlip3DPhysion'
 ]

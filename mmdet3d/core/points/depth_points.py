@@ -56,3 +56,14 @@ class DepthPoints(BasePoints):
         from mmdet3d.core.bbox import Coord3DMode
         return Coord3DMode.convert_point(
             point=self, src=Coord3DMode.DEPTH, dst=dst, rt_mat=rt_mat)
+        
+    def copy(self):
+        """Create a copy of the DepthPoints object.
+
+        Returns:
+            :obj:`DepthPoints`: A copy of the DepthPoints object.
+        """
+        return DepthPoints(
+            tensor=self.tensor.clone(),  
+            points_dim=self.points_dim,
+            attribute_dims=self.attribute_dims)

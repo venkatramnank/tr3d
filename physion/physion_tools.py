@@ -26,29 +26,29 @@ class PhysionPointCloudGenerator:
         else:
             self.frame_number = frame_number
         self.hf = h5py.File(self.hdf5_file_path, 'r')
-
         self.object_ids = self.hf["static"]["object_ids"][:].tolist()
         self.object_names = self.hf["static"]["model_names"][:]
         self.scales = self.hf["static"]["scale"][:]
         self.colors = self.hf['static']['color'][:]
         self.segmentation_colors = self.hf['static']['object_segmentation_colors'][:]
         self.projection_matrix = np.array(
-            self.hf['frames'][self.frame_number]['camera_matrices']['projection_matrix']).reshape(4, 4)
+            self.hf['frames'][self.frame_number]['camera_matrices']['projection_matrix_cam0']).reshape(4, 4)
         self.camera_matrix = np.array(
-            self.hf['frames'][self.frame_number]['camera_matrices']['camera_matrix']).reshape(4, 4)
+            self.hf['frames'][self.frame_number]['camera_matrices']['camera_matrix_cam0']).reshape(4, 4)
 
         self.img_array = self.io2image(
-            self.hf["frames"][self.frame_number]["images"]["_img"][:])
+            self.hf["frames"][self.frame_number]["images"]["_img_cam0"][:])
         self.img_height = self.img_array.shape[0]
         self.img_width = self.img_array.shape[1]
         self.seg_array = self.io2image(
-            self.hf["frames"][self.frame_number]["images"]["_id"][:])
-        #NOTE: Changed the dep_array ==> divide by 10
+            self.hf["frames"][self.frame_number]["images"]["_id_cam0"][:])
+
         self.dep_array = self.get_depth_values(
-            self.hf["frames"][self.frame_number]["images"]["_depth"][:], width=self.img_width, height=self.img_height, near_plane=0.1, far_plane=100, depth_pass='_depth')
+            self.hf["frames"][self.frame_number]["images"]["_depth_cam0"][:], width=self.img_width, height=self.img_height, near_plane=0.1, far_plane=100, depth_pass='_depth')
+        
         self.dep_array = np.where(self.dep_array > 80, 0, self.dep_array) #NOTE: Removal of far away depth
-        self.positions = self.hf["frames"][self.frame_number]["objects"]["positions"][:]
-        self.rotations = self.hf["frames"][self.frame_number]["objects"]["rotations"][:]
+        self.positions = self.hf["frames"][self.frame_number]["objects"]["positions_cam0"][:]
+        self.rotations = self.hf["frames"][self.frame_number]["objects"]["rotations_cam0"][:]
         self.plot = plot
         
     def io2image(self, tmp):
@@ -79,22 +79,23 @@ class PhysionPointCloudGenerator:
         :param far_plane: The far clipping plane. See command `set_camera_clipping_planes`. The default value in this function is the default value of the far clipping plane.
         :return An array of depth values.
         """
-        image = np.flip(np.reshape(image, (height, width, 3)), 1)
+        flipped_image = np.flip(image,  axis=1)
         # image = np.reshape(image, (height, width, 3))
         
         # Convert the image to a 2D image array.
-        if depth_pass == "_depth":
+        # if depth_pass == "_depth":
 
-            depth_values = np.array(
-                (image[:, :, 0] + image[:, :, 1] / 256.0 + image[:, :, 2] / (256.0 ** 2)))
-        elif depth_pass == "_depth_simple":
-            depth_values = image[:, :, 0] / 256.0
-        else:
-            raise Exception(f"Invalid depth pass: {depth_pass}")
+        #     depth_values = np.array(
+        #         (image[:, :, 0] + image[:, :, 1] / 512.0 + image[:, :, 2] / (512.0 ** 2)))
+        # elif depth_pass == "_depth_simple":
+        #     depth_values = image[:, :, 0] / 512.0
+        # else:
+        #     raise Exception(f"Invalid depth pass: {depth_pass}")
         # Un-normalize the depth values.
-        return (depth_values * ((far_plane - near_plane) / 256.0)).astype(np.float32)
+        return flipped_image
+        # return (flipped_image * ((far_plane - near_plane) / 512.0)).astype(np.float32)
 
-    def get_intrinsics_from_projection_matrix(self, proj_matrix, size=(256, 256)):
+    def get_intrinsics_from_projection_matrix(self, proj_matrix, size=(512, 512)):
         """Gets intrisic matrices
 
         Args:
@@ -206,7 +207,7 @@ class PhysionPointCloudGenerator:
     #     obj_3D = (np.linalg.inv(camera_matrix) @ obj_3D).T
     #     return obj_3D[:, :3]
     
-    def convert_2D_to_3D(self, obj_2D, camera_matrix, projection_matrix, target_resolution=(256, 256)):
+    def convert_2D_to_3D(self, obj_2D, camera_matrix, projection_matrix, target_resolution=(512, 512)):
         obj_num = obj_2D.shape[0]    
         # obj_2D[:, 1] = 1 - obj_2D[:, 1]/target_resolution[1]
         # obj_2D[:, 0] = obj_2D[:, 0]/target_resolution[0]
@@ -282,7 +283,7 @@ class PhysionPointCloudGenerator:
         background_depth_point_img = np.concatenate(
             [ind_b_all[:, 0][:, np.newaxis], ind_b_all[:, 1][:, np.newaxis], background_z_value[:, np.newaxis]], 1)
         background_depth_point_world = self.convert_2D_to_3D(
-            background_depth_point_img, camera_matrix, projection_matrix, target_resolution=(256, 256))
+            background_depth_point_img, camera_matrix, projection_matrix, target_resolution=(512, 512))
 
         return background_depth_point_world, background_rgb_value
 
@@ -338,7 +339,7 @@ class PhysionPointCloudGenerator:
 
             obj_depth_point_world_f.append(obj_depth_point_world)
             obj_partial_rgb_f.append(obj_rgb_value)
-
+        if len(obj_depth_point_world_f) == 0 : return None
         obj_depth_point_world_f = np.concatenate(
             obj_depth_point_world_f, axis=0)
         obj_partial_rgb_f = np.concatenate(obj_partial_rgb_f, axis=0)
@@ -401,6 +402,7 @@ class PointCloudVisualizer:
         return pcd
 
     def create_3d_bbox(self, center=None, dimensions=None, rotation_matrix=None, bbox_points=None, use_rot=False, use_points=False):
+
         if use_rot:
             bbox = o3d.geometry.OrientedBoundingBox(center=center, R=rotation_matrix, extent=dimensions)
             bbox.color = (0,1,0)
@@ -408,6 +410,7 @@ class PointCloudVisualizer:
         
         elif use_points:
             #built using corners
+            #TODO: NEED TO CHANGE
             # bbox_points = np.array(bbox_points).reshape(7,3)
             # bbox_points_vector = o3d.utility.Vector3dVector(bbox_points)
             # bbox = o3d.geometry.OrientedBoundingBox.create_from_points(bbox_points_vector)

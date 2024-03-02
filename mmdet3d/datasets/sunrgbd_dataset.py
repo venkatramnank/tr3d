@@ -149,7 +149,7 @@ class SUNRGBDDataset(Custom3DDataset):
         #Testing the new physion box structure
 
         # gt_bboxes_3d = Physion3DBoxes(gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         ###################################################################################################################################################### 
         
         # to target box structure

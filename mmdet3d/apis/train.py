@@ -204,6 +204,7 @@ def train_detector(model,
 
     runner_type = 'EpochBasedRunner' if 'runner' not in cfg else cfg.runner[
         'type']
+    # import pdb; pdb.set_trace() #DONE: See if the data is being shuffled (random frame sampling)
     data_loaders = [
         build_mmdet_dataloader(
             ds,
@@ -212,6 +213,7 @@ def train_detector(model,
             # `num_gpus` will be ignored if distributed
             num_gpus=len(cfg.gpu_ids),
             dist=distributed,
+            random_subset=True,
             seed=cfg.seed,
             runner_type=runner_type,
             persistent_workers=cfg.data.get('persistent_workers', False))

@@ -1,5 +1,5 @@
-voxel_size = .01 #NOTE: Increased voxel size
-n_points = 65536
+voxel_size = .03 #NOTE: Increased voxel size
+n_points = 262144
 
 model = dict(
     type='MinkSingleStage3DDetector',
@@ -45,7 +45,7 @@ resume_from = None
 workflow = [('train', 1)]
 
 dataset_type = 'PhysionDataset'
-data_root = '/home/kalyanav/MS_thesis/tr3d_data/physion_center_ortho_dominoes/'
+data_root = '/media/kalyanav/Venkat/support_data/'
 # class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
 train_pipeline = [
@@ -58,6 +58,9 @@ train_pipeline = [
         use_dim=[0, 1, 2, 3, 4, 5]),
     dict(type='LoadAnnotations3D'),
     dict(type='PointSample', num_points=n_points),
+    dict(
+        type='RandomFlip3DPhysion'
+    ),
     # dict(
     #     type='RandomFlip3D',
     #     sync_2d=False,
@@ -83,7 +86,7 @@ test_pipeline = [
         use_dim=[0, 1, 2, 3, 4, 5]),
     dict(
         type='MultiScaleFlipAug3D',
-        img_scale=(256, 256),
+        img_scale=(512, 512),
         pts_scale_ratio=1,
         flip=False,
         transforms=[
@@ -106,7 +109,7 @@ data = dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
-            ann_file=data_root + 'train.pkl',
+            ann_file=data_root + 'val.pkl',
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,

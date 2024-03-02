@@ -69,7 +69,8 @@ class PhysionDataset(Custom3DDataset):
         assert 'use_camera' in self.modality and \
             'use_lidar' in self.modality
         assert self.modality['use_camera'] or self.modality['use_lidar']
-
+    #TODO: modify this dataset in such a way at random only file name/information of data is taken
+    #TODO: Write a custom dataloader that loads at random sample 100 hdf5s and random frames from them
     def get_data_info(self, index):
         """Get data info according to the given index.
 
