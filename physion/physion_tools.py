@@ -424,7 +424,6 @@ class PointCloudVisualizer:
             lines = [[0, 1], [1, 3], [2, 3], [2, 0],
              [4, 5], [5, 7], [6, 7], [6, 4],
              [1, 5], [0, 4], [2,6], [3, 7]]
-
             lineset = o3d.geometry.LineSet()
             lineset.points = o3d.utility.Vector3dVector(bbox_points)
             lineset.lines = o3d.utility.Vector2iVector(lines)

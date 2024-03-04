@@ -44,22 +44,22 @@ load_from = None
 resume_from = None
 workflow = [('train', 1)]
 
-dataset_type = 'PhysionDataset'
+dataset_type = 'PhysioninpromptuDataset'
 data_root = '/media/kalyanav/Venkat/support_data/'
 # class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
 train_pipeline = [
-    dict(
-        type='LoadPointsFromFile',
-        coord_type='DEPTH',
-        shift_height=False,
-        use_color=True,
-        load_dim=6,
-        use_dim=[0, 1, 2, 3, 4, 5]),
+    # dict(
+    #     type='LoadPointsFromFile',
+    #     coord_type='DEPTH',
+    #     shift_height=False,
+    #     use_color=True,
+    #     load_dim=6,
+    #     use_dim=[0, 1, 2, 3, 4, 5]),
     dict(type='LoadAnnotations3D'),
     dict(type='PointSample', num_points=n_points),
     # dict(
-    #     type='RandomFlip3DPhysion'
+    #     type='RandomRotationTranslation'
     # ),
     # dict(
     #     type='RandomFlip3D',
@@ -109,26 +109,26 @@ data = dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
-            ann_file=data_root + 'train.pkl',
+            ann_file=data_root+'train_onthefly_data.pkl',
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
-            box_type_3d='Physion')),
-    val=dict(
-        type=dataset_type,
-        modality=dict(use_camera=False, use_lidar=True),
-        data_root=data_root,
-        ann_file=data_root + 'val.pkl',
-        pipeline=test_pipeline,
-        classes=class_names,
-        test_mode=True,
-        box_type_3d='Physion'),
-    test=dict(
-        type=dataset_type,
-        modality=dict(use_camera=False, use_lidar=True),
-        data_root=data_root,
-        ann_file=data_root + 'train.pkl',
-        pipeline=test_pipeline,
-        classes=class_names,
-        test_mode=True,
-        box_type_3d='Physion'))
+            box_type_3d='Physion')),)
+    # val=dict(
+    #     type=dataset_type,
+    #     modality=dict(use_camera=False, use_lidar=True),
+    #     data_root=data_root,
+    #     ann_file=data_root + 'val.pkl',
+    #     pipeline=test_pipeline,
+    #     classes=class_names,
+    #     test_mode=True,
+    #     box_type_3d='Physion'),
+    # test=dict(
+    #     type=dataset_type,
+    #     modality=dict(use_camera=False, use_lidar=True),
+    #     data_root=data_root,
+    #     ann_file=data_root + 'train.pkl',
+    #     pipeline=test_pipeline,
+    #     classes=class_names,
+    #     test_mode=True,
+    #     box_type_3d='Physion'))

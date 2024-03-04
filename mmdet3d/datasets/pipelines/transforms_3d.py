@@ -6,13 +6,14 @@ import cv2
 import numpy as np
 from mmcv import is_tuple_of
 from mmcv.utils import build_from_cfg
-
+import torch
 from mmdet3d.core import VoxelGenerator
 from mmdet3d.core.bbox import (CameraInstance3DBoxes, DepthInstance3DBoxes,
                                LiDARInstance3DBoxes, box_np_ops)
 from mmdet.datasets.pipelines import RandomFlip
 from ..builder import OBJECTSAMPLERS, PIPELINES
 from .data_augment_utils import noise_per_object_v3_
+from physion.external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np, compute_rotation_matrix_from_ortho6d
 
 
 @PIPELINES.register_module()
@@ -63,6 +64,165 @@ class RandomDropPointsColor(object):
         repr_str = self.__class__.__name__
         repr_str += f'(drop_ratio={self.drop_ratio})'
         return repr_str
+
+@PIPELINES.register_module()
+class RandomFlip3DPhysion(object):
+    def __init__(self):
+        self.axes_dict = {0: 'x axis', 2: 'z axis'}
+
+    def random_flip(self, points, gt_bboxes_3d):
+        # Randomly choose axes to flip
+        flip_axes = np.random.choice([2], size=1, replace=True)
+
+        # Perform flipping for pcd
+        pc = points.copy()
+        for axis in flip_axes:
+            pc.tensor[:, axis] = -pc.tensor[:, axis]
+
+        # negating the center
+        gt_boxes_list = gt_bboxes_3d.copy()
+        for gt_boxes in gt_boxes_list.tensor:
+            for axis in flip_axes:
+                gt_boxes[:3][axis] = -gt_boxes[:3][axis]
+                # rotation_matrix = compute_rotation_matrix_from_ortho6d(gt_boxes[6:].reshape(1,6))
+                # rotation_matrix = torch.diag(torch.tensor([1, 1, -1], dtype=rotation_matrix.dtype)) @ rotation_matrix
+                # gt_boxes[6:] = get_ortho6d_from_R(rotation_matrix)
+        return pc, gt_boxes_list
+
+    def __call__(self, input_dict):
+        input_dict['random_flip_points'] = True
+        input_dict['random_flip_gt_bbox_3d'] = True
+        flipped_pcd, flipped_gt_bboxes_3d = self.random_flip(input_dict['points'], input_dict['gt_bboxes_3d'])
+
+        input_dict['points'] = flipped_pcd
+        input_dict['gt_bboxes_3d'] = flipped_gt_bboxes_3d
+        input_dict['ann_info']['gt_bboxes_3d'] = flipped_gt_bboxes_3d
+        return input_dict
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f' (Random Flip performed)'
+        return repr_str
+
+
+@PIPELINES.register_module()
+class RandomRotationTranslation(object):
+    """
+    Applies random rotation and translation to a point cloud and object centers.
+
+    Args:
+        rotation_range (tuple, optional): A tuple of floats specifying the minimum and maximum degrees for random
+                                            rotations around each axis (X, Y, Z). Defaults to (-10, 10).
+        translation_range (tuple, optional): A tuple of floats specifying the minimum and maximum values for random
+                                            translation along each axis (X, Y, Z). Defaults to (-0.1, 0.1).
+    """
+
+    def __init__(self, rotation_range=(-10, 10), translation_range=(-0.1, 0.1)):
+        self.rotation_range = rotation_range
+        self.translation_range = translation_range
+        
+    def rotation_matrix_from_angles(self, angles, degrees=True):
+        """
+        Generates a rotation matrix from rotation angles around X, Y, and Z axes.
+
+        Args:
+            angles (torch.Tensor): A tensor of shape (3,) containing rotation angles (in degrees or radians).
+            degrees (bool, optional): Whether the angles are provided in degrees (default) or radians.
+
+        Returns:
+            torch.Tensor: A rotation matrix of shape (3, 3).
+        """
+
+        if degrees:
+            angles = np.radians(angles)  # Convert to radians if needed
+
+        sx, sy, sz = np.sin(angles)
+        cx, cy, cz = np.cos(angles)
+
+        return torch.tensor([
+            [cy * cz, -cy * sx, sy],
+            [sz * cx, cz * cx, -sx],
+            [-sy * cz, sy * sx, cy]
+        ])
+
+
+    def random_transform(self, points, centers):
+        """
+        Applies random rotation and translation to points and centers.
+
+        Args:
+            points (torch.Tensor): A tensor of shape (num_points, 6) representing the point cloud.
+            centers (torch.Tensor): A tensor of shape (num_objects, 3) representing the centers of n boxes.
+
+        Returns:
+            tuple: A tuple containing the transformed point cloud and object centers.
+        """
+
+        # Generate random rotations
+        num_objects = centers.shape[0]
+        random_rotations = np.random.rand(num_objects, 3) * (self.rotation_range[1] - self.rotation_range[0]) + self.rotation_range[0]
+
+        # Generate random translations
+        random_translations = np.random.rand(num_objects, 3) * (self.translation_range[1] - self.translation_range[0]) + self.translation_range[0]
+
+        # Apply transformations
+        # 1. Convert angles to radians if needed (assuming your rotation matrix generation function requires radians)
+        random_rotations = np.radians(random_rotations)  
+
+        # 2. Replace with your function to generate rotation matrices from angles
+        rotation_matrices = []
+        for rot_angles in random_rotations:
+            rotation_matrices.append(self.rotation_matrix_from_angles(rot_angles))
+        rotation_matrices = torch.stack(rotation_matrices) 
+
+        # 3. Transform points 
+        coordinates = points[:, :3]
+        colors = points[:, 3:]
+
+        # 4. Apply rotation to coordinates
+        transformed_coordinates = torch.einsum('bij,nj->ni', rotation_matrices, coordinates.double())
+        # 5. Apply translations to transformed_coordinates
+        for r_trans in random_translations:
+            transformed_coordinates += torch.tensor(r_trans, dtype=transformed_coordinates.dtype)
+
+        # 6. Apply rotation to centers
+        centers = torch.einsum('bij,nj->ni', rotation_matrices, centers.double())
+
+        # 7. Apply translations to centers
+        for r_trans in random_translations:
+            centers += torch.tensor(r_trans, dtype=centers.dtype)
+        # 8. Combine transformed coordinates and color
+        transformed_points = torch.cat((transformed_coordinates, colors), dim=1)
+
+        return transformed_points, centers
+
+
+    def __call__(self, input_dict):
+        """
+        Applies random rotation and translation to point cloud and object centers in the input dictionary.
+
+        Args:
+            input_dict (dict): A dictionary containing the data to be transformed.
+
+        Returns:
+            dict: The updated dictionary with transformed data.
+        """
+
+        # Apply transformations
+        transformed_points, transformed_centers = self.random_transform(input_dict['points'].tensor, input_dict['gt_bboxes_3d'].tensor[:, :3])
+
+        # Update input dictionary
+        input_dict['points'].tensor = transformed_points
+        input_dict['gt_bboxes_3d'].tensor[:, :3] = transformed_centers
+
+        return input_dict
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f' (applies random rotation: {self.rotation_range}, translation: {self.translation_range})'
+        return repr_str
+ 
+
 
 @PIPELINES.register_module()
 class RandomFlip3D(RandomFlip):
@@ -154,6 +314,7 @@ class RandomFlip3D(RandomFlip):
                 'pcd_horizontal_flip' and 'pcd_vertical_flip' keys are added
                 into result dict.
         """
+
         # flip 2D image and its annotations
         super(RandomFlip3D, self).__call__(input_dict)
 

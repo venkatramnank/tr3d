@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import math
 from mpl_toolkits.mplot3d import Axes3D
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
-from physion_tools import PhysionPointCloudGenerator, PointCloudVisualizer, canonical_to_world_np, world_to_canonical_np, convert_to_world_coords, bbox_to_corners
+from physion.physion_tools import PhysionPointCloudGenerator, PointCloudVisualizer, canonical_to_world_np, world_to_canonical_np, convert_to_world_coords, bbox_to_corners
 import matplotlib.pyplot as plt, numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -536,32 +536,32 @@ if __name__ == "__main__":
     start = 50
     frames_per_vid = 50
 
-    # for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
-    #     if 'pilot_towers_nb4_fr015_SJ000_gr01_mono1_dis0_occ0_boxroom_stable_0274' in _file: #TODO use dominoes only or 'collision' in _file
-    #         # for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
-    #             if os.path.join(PHYSION_HDF5_ROOT, _file).endswith('hdf5'):
-    #                 import pdb; pdb.set_trace()
-    #                 vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, _file)
-    #                 print("Looking at : ", os.path.join(_file))
-    #                 try:
-    #                     with h5py.File(vid_hdf5_path, 'r') as file:
-    #                         for frame_id in [key for key in file["frames"].keys()]:
+    for _file_idx, _file in enumerate(sorted(os.listdir(PHYSION_HDF5_ROOT))):
+        if 'pilot_towers_nb4_fr015_SJ000_gr01_mono1_dis0_occ0_boxroom_stable_0274' in _file: #TODO use dominoes only or 'collision' in _file
+            # for filename in sorted((os.listdir(os.path.join(PHYSION_HDF5_ROOT, _file)))):
+                if os.path.join(PHYSION_HDF5_ROOT, _file).endswith('hdf5'):
+                    import pdb; pdb.set_trace()
+                    vid_hdf5_path = os.path.join(PHYSION_HDF5_ROOT, _file)
+                    print("Looking at : ", os.path.join(_file))
+                    try:
+                        with h5py.File(vid_hdf5_path, 'r') as file:
+                            for frame_id in [key for key in file["frames"].keys()]:
                                 
-    #                             phys_dict = get_phys_dict(file, img_idx, _file, _file_idx, frame_id)
+                                phys_dict = get_phys_dict(file, img_idx, _file, _file_idx, frame_id)
                                 
-    #                             if phys_dict is None:
-    #                                 print("Broken input ......")
-    #                                 continue
-    #                             print(_file, frame_id)
-    #                             print("img_idx: ",img_idx)
-    #                             img_idx += 1
-    #                             if phys_dict['annos']['gt_boxes_upright_depth'].size != 0:
-    #                                 data_infos.append(phys_dict)
-    #                 except OSError:
-    #                     continue
-    # print("Storing {} pickle file ....".format(SPLIT) )
-    # with open(PREV_PKL_FILE_PATH, "wb") as pickle_file:
-    #     pickle.dump(data_infos, pickle_file)
+                                if phys_dict is None:
+                                    print("Broken input ......")
+                                    continue
+                                print(_file, frame_id)
+                                print("img_idx: ",img_idx)
+                                img_idx += 1
+                                if phys_dict['annos']['gt_boxes_upright_depth'].size != 0:
+                                    data_infos.append(phys_dict)
+                    except OSError:
+                        continue
+    print("Storing {} pickle file ....".format(SPLIT) )
+    with open(PREV_PKL_FILE_PATH, "wb") as pickle_file:
+        pickle.dump(data_infos, pickle_file)
     
     import re
 

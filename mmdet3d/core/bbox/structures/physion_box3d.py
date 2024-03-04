@@ -37,7 +37,6 @@ class Physion3DBoxes(object):
         self.with_ortho6d = with_ortho6d
         self.rotation_matrix = compute_rotation_matrix_from_ortho6d(tensor[:, 6:])
         self.box_dim = box_dim
-       
         
         
     @property
@@ -155,6 +154,7 @@ class Physion3DBoxes(object):
                (x0, y0, z0) + ----------- + --------> right x
                                           (x1, y0, z0)
         """
+        
         if self.tensor.numel() == 0:
             return torch.empty([0, 8, 3], device=self.tensor.device)
         dims = self.tensor[:, 3:6]
@@ -175,6 +175,7 @@ class Physion3DBoxes(object):
             torch.Tensor([-0.5, -0.5, 0.5]),
             torch.Tensor([-0.5, -0.5, -0.5])            
         ]).to(device=dims.device, dtype=dims.dtype)
+
         # corners_norm = torch.from_numpy(
         #     np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)).to(
         #         device=dims.device, dtype=dims.dtype)
@@ -185,7 +186,7 @@ class Physion3DBoxes(object):
         # use relative origin (0.5, 0.5, 0.5)
         # corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0.5])
         corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
-
+        # self.rotation_matrix = torch.diag(torch.tensor([1, 1, -1], dtype=self.rotation_matrix.dtype)) @ self.rotation_matrix
         corners = self.rotation_matrix@corners.transpose(1,2)
         corners = corners.permute(0,2,1) 
         corners += self.tensor[:, :3].view(-1, 1, 3)

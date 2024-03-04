@@ -99,10 +99,11 @@ class MinkSingleStage3DDetector(Base3DDetector):
             dict: Centerness, bbox and classification loss values.
         """
         ######################################################################################
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         # visualizing the points and gt_bboxes_3d to make sure it is alright
-        visualizer = PointCloudVisualizer()
-        visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
+        # visualizer = PointCloudVisualizer()
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
         #####################################################################################
         x = self.extract_feats(points)
         losses = self.head.forward_train(x, gt_bboxes_3d, gt_labels_3d,
