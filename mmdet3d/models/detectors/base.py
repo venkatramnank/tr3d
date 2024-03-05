@@ -84,8 +84,9 @@ class Base3DDetector(BaseDetector):
                 ValueError(f"Unsupported data type {type(data['points'][0])} "
                            f'for visualization!')
             if isinstance(data['img_metas'][0], DC):
-                pts_filename = data['img_metas'][0]._data[0][batch_id][
-                    'pts_filename']
+                # pts_filename = data['img_metas'][0]._data[0][batch_id][
+                #     'pts_filename']
+                file_name = data['filename']
                 box_mode_3d = data['img_metas'][0]._data[0][batch_id][
                     'box_mode_3d']
             elif mmcv.is_list_of(data['img_metas'][0], dict):
@@ -95,7 +96,7 @@ class Base3DDetector(BaseDetector):
                 ValueError(
                     f"Unsupported data type {type(data['img_metas'][0])} "
                     f'for visualization!')
-            file_name = osp.split(pts_filename)[-1].split('.')[0]
+            # file_name = osp.split(pts_filename)[-1].split('.')[0]
 
             assert out_dir is not None, 'Expect out_dir, got none.'
             
@@ -123,7 +124,7 @@ class Base3DDetector(BaseDetector):
             
             # pred_corners = (bbox_to_corners(pred_bboxes.tensor) + points_mink.unsqueeze(1)).cpu().numpy()
             pred_bboxes = pred_bboxes.tensor.cpu().numpy()
-            
+            import pdb; pdb.set_trace()
             show_result_physion(
                 points,
                 gt_bbox,

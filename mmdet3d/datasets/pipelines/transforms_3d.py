@@ -72,7 +72,7 @@ class RandomFlip3DPhysion(object):
 
     def random_flip(self, points, gt_bboxes_3d):
         # Randomly choose axes to flip
-        flip_axes = np.random.choice([2], size=1, replace=True)
+        flip_axes = np.random.choice([0, 2], size=1, replace=True)
 
         # Perform flipping for pcd
         pc = points.copy()
@@ -80,13 +80,14 @@ class RandomFlip3DPhysion(object):
             pc.tensor[:, axis] = -pc.tensor[:, axis]
 
         # negating the center
-        gt_boxes_list = gt_bboxes_3d.copy()
-        for gt_boxes in gt_boxes_list.tensor:
+        gt_boxes_list = gt_bboxes_3d.tensor.clone()
+        for gt_boxes in gt_boxes_list:
             for axis in flip_axes:
                 gt_boxes[:3][axis] = -gt_boxes[:3][axis]
-                # rotation_matrix = compute_rotation_matrix_from_ortho6d(gt_boxes[6:].reshape(1,6))
-                # rotation_matrix = torch.diag(torch.tensor([1, 1, -1], dtype=rotation_matrix.dtype)) @ rotation_matrix
-                # gt_boxes[6:] = get_ortho6d_from_R(rotation_matrix)
+                rotation_matrix = compute_rotation_matrix_from_ortho6d(gt_boxes[6:].reshape(1,6)).squeeze(0)
+                rotation_matrix[axis, :] = - rotation_matrix[axis, :]
+                gt_boxes[6:] = get_ortho6d_from_R(rotation_matrix)
+        
         return pc, gt_boxes_list
 
     def __call__(self, input_dict):
@@ -95,8 +96,8 @@ class RandomFlip3DPhysion(object):
         flipped_pcd, flipped_gt_bboxes_3d = self.random_flip(input_dict['points'], input_dict['gt_bboxes_3d'])
 
         input_dict['points'] = flipped_pcd
-        input_dict['gt_bboxes_3d'] = flipped_gt_bboxes_3d
-        input_dict['ann_info']['gt_bboxes_3d'] = flipped_gt_bboxes_3d
+        input_dict['gt_bboxes_3d'] = input_dict['gt_bboxes_3d'].new_box(flipped_gt_bboxes_3d)
+        input_dict['ann_info']['gt_bboxes_3d'] = input_dict['gt_bboxes_3d'].new_box(flipped_gt_bboxes_3d)
         return input_dict
 
     def __repr__(self):

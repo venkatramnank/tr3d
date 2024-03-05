@@ -46,10 +46,10 @@ class TR3DHead(BaseModule):
     def _init_layers(self, n_classes, in_channels, n_reg_outs):
         self.bbox_conv= ME.MinkowskiConvolution(
             in_channels, n_reg_outs , kernel_size=1, bias=True, dimension=3)
-        self.bbox_conv1 = ME.MinkowskiConvolution(
-            in_channels, in_channels // 2, kernel_size=1, bias=True, dimension=3)
-        self.bbox_conv2 = ME.MinkowskiConvolution(
-            in_channels // 2, n_reg_outs, kernel_size=1, bias=True, dimension=3)
+        # self.bbox_conv1 = ME.MinkowskiConvolution(
+        #     in_channels, in_channels // 2, kernel_size=1, bias=True, dimension=3)
+        # self.bbox_conv2 = ME.MinkowskiConvolution(
+        #     in_channels // 2, n_reg_outs, kernel_size=1, bias=True, dimension=3)
         self.cls_conv = ME.MinkowskiConvolution(
             in_channels, n_classes, kernel_size=1, bias=True, dimension=3)
 
@@ -57,8 +57,7 @@ class TR3DHead(BaseModule):
         nn.init.normal_(self.bbox_conv.kernel, std=.01)
         nn.init.normal_(self.cls_conv.kernel, std=.01)
         nn.init.constant_(self.cls_conv.bias, bias_init_with_prob(.01))
-        nn.init.normal_(self.bbox_conv1.kernel, std=0.01)
-        nn.init.normal_(self.bbox_conv2.kernel, std=0.01)
+
 
     # per level
     def _forward_single(self, x):
@@ -229,7 +228,6 @@ class TR3DHead(BaseModule):
             pos_bbox_preds = bbox_preds[pos_mask]
             bbox_targets = torch.cat((gt_bboxes.tensor[:,:3], gt_bboxes.tensor[:, 3:]), dim=1)
             pos_bbox_targets = bbox_targets.to(points.device)[assigned_ids][pos_mask]
-
 
             # if pos_bbox_preds.shape[1] == 6:
             #     pos_bbox_targets = pos_bbox_targets[:, :6]

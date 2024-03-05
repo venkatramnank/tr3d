@@ -17,7 +17,7 @@ model = dict(
         voxel_size=voxel_size,
         assigner=dict(
             type='TR3DAssigner',
-            top_pts_threshold=8,
+            top_pts_threshold=6,
             label2level=[1]),
         bbox_loss=dict(type='CornerBoundingBoxLoss')),
     train_cfg=dict(),
@@ -58,9 +58,9 @@ train_pipeline = [
     #     use_dim=[0, 1, 2, 3, 4, 5]),
     dict(type='LoadAnnotations3D'),
     dict(type='PointSample', num_points=n_points),
-    # dict(
-    #     type='RandomRotationTranslation'
-    # ),
+    dict(
+        type='RandomFlip3DPhysion'
+    ),
     # dict(
     #     type='RandomFlip3D',
     #     sync_2d=False,
@@ -77,13 +77,13 @@ train_pipeline = [
     dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [
-    dict(
-        type='LoadPointsFromFile',
-        coord_type='DEPTH',
-        shift_height=False,
-        use_color=True,
-        load_dim=6,
-        use_dim=[0, 1, 2, 3, 4, 5]),
+    # dict(
+    #     type='LoadPointsFromFile',
+    #     coord_type='DEPTH',
+    #     shift_height=False,
+    #     use_color=True,
+    #     load_dim=6,
+    #     use_dim=[0, 1, 2, 3, 4, 5]),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(512, 512),
@@ -100,11 +100,12 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=16,
-    workers_per_gpu=0,
+    samples_per_gpu=8,
+    workers_per_gpu=4,
+    persistent_workers=True,
     train=dict(
         type='RepeatDataset',
-        times=5,
+        times=1,
         dataset=dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
@@ -113,22 +114,22 @@ data = dict(
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
-            box_type_3d='Physion')),)
-    # val=dict(
-    #     type=dataset_type,
-    #     modality=dict(use_camera=False, use_lidar=True),
-    #     data_root=data_root,
-    #     ann_file=data_root + 'val.pkl',
-    #     pipeline=test_pipeline,
-    #     classes=class_names,
-    #     test_mode=True,
-    #     box_type_3d='Physion'),
-    # test=dict(
-    #     type=dataset_type,
-    #     modality=dict(use_camera=False, use_lidar=True),
-    #     data_root=data_root,
-    #     ann_file=data_root + 'train.pkl',
-    #     pipeline=test_pipeline,
-    #     classes=class_names,
-    #     test_mode=True,
-    #     box_type_3d='Physion'))
+            box_type_3d='Physion')),
+    val=dict(
+        type=dataset_type,
+        modality=dict(use_camera=False, use_lidar=True),
+        data_root=data_root,
+        ann_file=data_root + 'val_onthefly_data.pkl',
+        pipeline=test_pipeline,
+        classes=class_names,
+        test_mode=True,
+        box_type_3d='Physion'),
+    test=dict(
+        type=dataset_type,
+        modality=dict(use_camera=False, use_lidar=True),
+        data_root=data_root,
+        ann_file=data_root + 'val_onthefly_data.pkl',
+        pipeline=test_pipeline,
+        classes=class_names,
+        test_mode=True,
+        box_type_3d='Physion'))
