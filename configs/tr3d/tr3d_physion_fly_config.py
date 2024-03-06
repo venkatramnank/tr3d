@@ -44,7 +44,7 @@ load_from = None
 resume_from = None
 workflow = [('train', 1)]
 
-dataset_type = 'PhysioninpromptuDataset'
+dataset_type = 'PhysionRandomFrameDataset'
 data_root = '/media/kalyanav/Venkat/support_data/'
 # class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
@@ -100,13 +100,12 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=16,
     workers_per_gpu=4,
-    persistent_workers=True,
-    train=dict(
-        type='RepeatDataset',
-        times=1,
-        dataset=dict(
+    persistent_workers=False,
+    num_frames_per_file = 10,
+    train=
+        dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
@@ -114,7 +113,7 @@ data = dict(
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
-            box_type_3d='Physion')),
+            box_type_3d='Physion'),
     val=dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),

@@ -30,11 +30,12 @@ from .waymo_dataset import WaymoDataset
 from .physion_dataset import PhysionDataset
 from .physion_on_thefly_dataset import PhysionHDF5Dataset
 from .physion_inpromptu_dataset import PhysioninpromptuDataset
+from .physion_random_frame_dataset import PhysionRandomFrameDataset
 
 __all__ = [
     'KittiDataset', 'KittiMonoDataset', 'build_dataloader', 'DATASETS',
     'build_dataset', 'NuScenesDataset', 'NuScenesMonoDataset', 'LyftDataset',
-    'PhysionDataset','PhysionHDF5Dataset','PhysioninpromptuDataset',
+    'PhysionDataset','PhysionHDF5Dataset','PhysioninpromptuDataset', 'PhysionRandomFrameDataset',
     'ObjectSample', 'RandomFlip3D', 'ObjectNoise', 'GlobalRotScaleTrans',
     'PointShuffle', 'ObjectRangeFilter', 'PointsRangeFilter',
     'LoadPointsFromFile', 'S3DISSegDataset', 'S3DISDataset',

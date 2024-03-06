@@ -22,6 +22,7 @@ from mmdet3d.core.bbox.structures.physion_box3d import Physion3DBoxes
 import multiprocessing
 from tqdm import tqdm
 import concurrent
+import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from mmdet3d.core.points import BasePoints, get_points_type
@@ -29,7 +30,7 @@ warnings.filterwarnings("ignore")
 
 
 @DATASETS.register_module()
-class PhysioninpromptuDataset(Dataset):
+class PhysionRandomFrameDataset(Dataset):
     """Physion HDF5 Dataset.
 
     This is the base dataset of SUNRGB-D, ScanNet, nuScenes, and KITTI
@@ -84,6 +85,7 @@ class PhysioninpromptuDataset(Dataset):
                  box_type_3d='Physion',
                  filter_empty_gt=True,
                  test_mode=False,
+                 number_of_frames_per_file = 10,
                  file_client_args=dict(backend='disk')):
         super().__init__()
         self.data_root = data_root
@@ -100,6 +102,8 @@ class PhysioninpromptuDataset(Dataset):
         self.total_length = 0
         self.annotations_cache = dict()
         self.iter_initialized = False
+        self.file_client_args = file_client_args
+        self.number_of_frames_per_file = number_of_frames_per_file
         # load annotations
         if hasattr(self.file_client, 'get_local_path'):
             with self.file_client.get_local_path(self.ann_file) as local_path:
@@ -112,6 +116,8 @@ class PhysioninpromptuDataset(Dataset):
                 'Please use MMCV>= 1.3.16 if you meet errors.')
             self.data_infos = self.load_annotations(self.ann_file)
         # process pipeline
+
+       
         if pipeline is not None:
             self.pipeline = Compose(pipeline)
 
@@ -124,9 +130,30 @@ class PhysioninpromptuDataset(Dataset):
         with h5py.File(file_path, 'r') as file:
             # Call your processing function with necessary arguments
             return self.get_phys_dict(file, img_idx, _file, frame_id, ann_dir)
+        
+    def random_select_frames(self, data_files):
+        sampled_frames = {}
+
+        for data_file in data_files:
+            if data_file[1] not in sampled_frames:
+                sampled_frames[data_file[1]] = []
+            sampled_frames[data_file[1]].append([data_file[0], data_file[1], data_file[2]])
+        # Sample 10 frames from each file, ensuring all files are covered.
+        sampled_data = []
+        for file, frames in sampled_frames.items():
+            if len(frames) >= self.number_of_frames_per_file:
+                sampled_data.extend(random.sample(frames, 10))
+            else:
+                sampled_data.extend(frames)
+
+        # Randomly shuffle the sampled data.
+        random.shuffle(sampled_data)
+
+        return sampled_data
 
     def get_phys_dict(self, file, img_idx, _file, frame_id):
         # file_frame_combined_name = _file.split(".hdf5")[0] + "_" + str(_file_idx) + "_" + frame_id
+        file_info = {'_file' :os.path.basename(_file), 'frame_id': frame_id}
         s_obj = file["static"]
         f_obj = file["frames"]
         rgb = f_obj[frame_id]["images"]["_img_cam0"][:]
@@ -317,6 +344,7 @@ class PhysioninpromptuDataset(Dataset):
 
         assert len(gt_boxes_upright_depth_list) == annos['gt_num']
         return {
+            'file_info': file_info,
             'point_cloud': pcd_info,
             'points': pcd_points,
             # 'image': image_obj,
@@ -362,7 +390,7 @@ class PhysioninpromptuDataset(Dataset):
         sample_idx = info['point_cloud']['lidar_idx']
         # assert info['point_cloud']['lidar_idx'] == info['image']['image_idx']
         input_dict = dict(sample_idx=sample_idx)
-
+        input_dict['file_info'] = info['file_info']
         if self.modality['use_lidar']:
             # pts_filename = osp.join(self.data_root, info['pts_path'])
             input_dict['points'] =  self._points_class_builder(info['points'])
@@ -704,7 +732,7 @@ class PhysioninpromptuDataset(Dataset):
         """
         #TODO: store the files in [index, name, frame id] in a pkl file and load it here as annotation data
         #TODO: Then change parts where we extract on the fly (do it quick!!!)
-        import pdb; pdb.set_trace()
+        
         if self.test_mode:
             return self.prepare_test_data(idx)
         while True:
@@ -722,3 +750,22 @@ class PhysioninpromptuDataset(Dataset):
         zeros.
         """
         self.flag = np.zeros(len(self), dtype=np.uint8)
+
+    def random_sample(self):
+        self.data_infos = self.random_select_frames(self.data_infos)
+        print("Dataset Sampled!!")
+        
+    def copy(self):
+        copied_dataset = PhysionRandomFrameDataset(
+            data_root=self.data_root,
+            ann_file=self.ann_file,
+            pipeline=self.pipeline,
+            classes=self.CLASSES,
+            modality=self.modality,
+            box_type_3d=self.box_type_3d,
+            filter_empty_gt=self.filter_empty_gt,
+            test_mode=self.test_mode,
+            number_of_frames_per_file=self.number_of_frames_per_file,
+            file_client_args=self.file_client_args
+        )
+        return copied_dataset

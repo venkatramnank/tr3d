@@ -214,6 +214,7 @@ def train_detector(model,
             num_gpus=len(cfg.gpu_ids),
             dist=distributed,
             random_subset=True,
+            num_frames_per_file = cfg.data.num_frames_per_file,
             seed=cfg.seed,
             runner_type=runner_type,
             persistent_workers=cfg.data.get('persistent_workers', False))

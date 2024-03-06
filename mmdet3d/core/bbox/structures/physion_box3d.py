@@ -131,6 +131,7 @@ class Physion3DBoxes(object):
     #     corners += self.bottom_center.view(-1, 1, 3)
     #     return corners
     
+    
     @property 
     def corners(self):
         """torch.Tensor: Coordinates of corners of all the boxes
