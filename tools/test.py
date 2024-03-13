@@ -199,7 +199,6 @@ def main():
     # set random seeds
     if args.seed is not None:
         set_random_seed(args.seed, deterministic=args.deterministic)
-
     # build the dataloader
     dataset = build_dataset(cfg.data.test)
     data_loader = build_dataloader(dataset, **test_loader_cfg)
@@ -229,8 +228,9 @@ def main():
     if not distributed:
         #TODO(venkat) : make sure that visualizations are not shown each time
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
-        outputs = single_gpu_test(model, data_loader, show=args.show, out_dir=args.show_dir)
-        # outputs = single_gpu_test(model, data_loader)
+
+        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir)
+
     else:
         model = MMDistributedDataParallel(
             model.cuda(),

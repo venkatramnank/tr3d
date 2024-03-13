@@ -14,9 +14,9 @@ from .pipelines import Compose
 
 
 @DATASETS.register_module()
-class SUNRGBDDataset(Custom3DDataset):
-    r"""SUNRGBD Dataset.
-
+class PhysionDataset(Custom3DDataset):
+    r"""Physion Dataset.
+    TODO: NEED TO UPDATE!!
     This class serves as the API for experiments on the SUNRGBD Dataset.
 
     See the `download page <http://rgbd.cs.princeton.edu/challenge.html>`_
@@ -44,9 +44,7 @@ class SUNRGBDDataset(Custom3DDataset):
         test_mode (bool, optional): Whether the dataset is in test mode.
             Defaults to False.
     """
-    
-    CLASSES = ('bed', 'table', 'sofa', 'chair', 'toilet', 'desk', 'dresser',
-               'night_stand', 'bookshelf', 'bathtub')
+    CLASSES = ('object')
 
     def __init__(self,
                  data_root,
@@ -54,11 +52,10 @@ class SUNRGBDDataset(Custom3DDataset):
                  pipeline=None,
                  classes=None,
                  modality=dict(use_camera=True, use_lidar=True),
-                 box_type_3d='Depth',
+                 box_type_3d='Physion',
                  filter_empty_gt=True,
                  test_mode=False,
                  **kwargs):
-        
         super().__init__(
             data_root=data_root,
             ann_file=ann_file,
@@ -72,7 +69,9 @@ class SUNRGBDDataset(Custom3DDataset):
         assert 'use_camera' in self.modality and \
             'use_lidar' in self.modality
         assert self.modality['use_camera'] or self.modality['use_lidar']
-
+        import pdb; pdb.set_trace()
+    #TODO: modify this dataset in such a way at random only file name/information of data is taken
+    #TODO: Write a custom dataloader that loads at random sample 100 hdf5s and random frames from them
     def get_data_info(self, index):
         """Get data info according to the given index.
 
@@ -91,7 +90,7 @@ class SUNRGBDDataset(Custom3DDataset):
                 - calib (dict, optional): Camera calibration info.
                 - ann_info (dict): Annotation info.
         """
- 
+        import pdb; pdb.set_trace()
         info = self.data_infos[index]
         sample_idx = info['point_cloud']['lidar_idx']
         assert info['point_cloud']['lidar_idx'] == info['image']['image_idx']
@@ -150,17 +149,12 @@ class SUNRGBDDataset(Custom3DDataset):
             
         ######################################################################################################################################################   
         #Testing the new physion box structure
-
-        # gt_bboxes_3d = Physion3DBoxes(gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
-        # import pdb; pdb.set_trace()
+        gt_bboxes_3d = Physion3DBoxes(gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
         ###################################################################################################################################################### 
         
         # to target box structure
-        gt_bboxes_3d = DepthInstance3DBoxes(
-            gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
-        
-        
-        
+        # gt_bboxes_3d = DepthInstance3DBoxes(
+        #     gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
 
         anns_results = dict(
             gt_bboxes_3d=gt_bboxes_3d, gt_labels_3d=gt_labels_3d)
@@ -194,6 +188,7 @@ class SUNRGBDDataset(Custom3DDataset):
             pipeline.insert(0, dict(type='LoadImageFromFile'))
         return Compose(pipeline)
 
+
     def show(self, results, out_dir, show=True, pipeline=None):
         """Results visualization.
 
@@ -204,7 +199,6 @@ class SUNRGBDDataset(Custom3DDataset):
             pipeline (list[dict], optional): raw data loading for showing.
                 Default: None.
         """
-
         assert out_dir is not None, 'Expect out_dir, got none.'
         pipeline = self._get_pipeline(pipeline)
         for i, result in enumerate(results):
@@ -212,10 +206,10 @@ class SUNRGBDDataset(Custom3DDataset):
             pts_path = data_info['pts_path']
             file_name = osp.split(pts_path)[-1].split('.')[0]
             points, img_metas, img = self._extract_data(
-                i, pipeline, ['points', 'img_metas', 'img']) # img is None
+                i, pipeline, ['points', 'img_metas', 'img'])
             # scale colors to [0, 255]
-            points = points.numpy() # 50000 x 6
-            points[:, 3:] *= 255 # last three columns are multiplied by 255
+            points = points.numpy()
+            points[:, 3:] *= 255
 
             gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
             gt_corners = gt_bboxes.corners.numpy() if len(gt_bboxes) else None
@@ -275,6 +269,7 @@ class SUNRGBDDataset(Custom3DDataset):
         Returns:
             dict: Evaluation results.
         """
+        # import pdb; pdb.set_trace()
         # evaluate 3D detection performance
         if isinstance(results[0], dict):
             return super().evaluate(results, metric, iou_thr, logger, show,

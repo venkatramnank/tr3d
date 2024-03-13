@@ -10,9 +10,16 @@ from mmcv.cnn import bias_init_with_prob
 from mmcv.ops import nms3d, nms3d_normal
 from mmcv.runner import BaseModule
 from torch import nn
-
+import numpy as np
 from mmdet3d.models.builder import HEADS, build_loss
 from mmdet.core.bbox.builder import BBOX_ASSIGNERS, build_assigner
+from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
+from physion.physion_tools import PointCloudVisualizer, convert_to_world_coords_torch
+# from physion.physion_nms import iou
+from torch.utils.tensorboard import SummaryWriter
+
+
+writer = SummaryWriter(log_dir="/home/kalyanav/MS_thesis/mmdetection3d/work_dirs/tr3d_physion_config/summary_logs")
 
 
 @HEADS.register_module()
@@ -37,8 +44,12 @@ class TR3DHead(BaseModule):
         self._init_layers(n_classes, in_channels, n_reg_outs)
 
     def _init_layers(self, n_classes, in_channels, n_reg_outs):
-        self.bbox_conv = ME.MinkowskiConvolution(
-            in_channels, n_reg_outs, kernel_size=1, bias=True, dimension=3)
+        self.bbox_conv= ME.MinkowskiConvolution(
+            in_channels, n_reg_outs , kernel_size=1, bias=True, dimension=3)
+        # self.bbox_conv1 = ME.MinkowskiConvolution(
+        #     in_channels, in_channels // 2, kernel_size=1, bias=True, dimension=3)
+        # self.bbox_conv2 = ME.MinkowskiConvolution(
+        #     in_channels // 2, n_reg_outs, kernel_size=1, bias=True, dimension=3)
         self.cls_conv = ME.MinkowskiConvolution(
             in_channels, n_classes, kernel_size=1, bias=True, dimension=3)
 
@@ -47,12 +58,18 @@ class TR3DHead(BaseModule):
         nn.init.normal_(self.cls_conv.kernel, std=.01)
         nn.init.constant_(self.cls_conv.bias, bias_init_with_prob(.01))
 
+
     # per level
     def _forward_single(self, x):
+        # nx = self.bbox_conv1(x)
         reg_final = self.bbox_conv(x).features
-        reg_distance = torch.exp(reg_final[:, 3:6])
-        reg_angle = reg_final[:, 6:]
-        bbox_pred = torch.cat((reg_final[:, :3], reg_distance, reg_angle), dim=1)
+        # reg_distance = torch.exp(reg_final[:, 3:6])
+        reg_distance = reg_final[:, 3:6]
+        reg_center = reg_final[:, :3]
+        #TODO: Need to fix this for accepting 6d 
+        # reg_angle = reg_final[:, 6:]
+        reg_6d_ortho = reg_final[:, 6:]
+        bbox_pred = torch.cat((reg_center, reg_distance, reg_6d_ortho), dim=1)
         cls_pred = self.cls_conv(x).features
 
         bbox_preds, cls_preds, points = [], [], []
@@ -72,6 +89,56 @@ class TR3DHead(BaseModule):
             points.append(point)
         return bbox_preds, cls_preds, points
 
+    
+    @staticmethod
+    def bbox_to_corners(bbox, pos_points=None):
+        """Converts the center, h,w,l,ortho6d format into corners
+
+        Args:
+            bbox (Tensor): Input of size (N, 12)
+
+        Returns:
+            Tensor: Corners (including the center) of shape (N, 8, 3)
+        """
+
+        if bbox.shape[-1] != 12:
+            return bbox
+        
+        if bbox.numel() == 0:
+            return torch.empty([0, 8, 3], device=bbox.device)
+        center = bbox[:, :3]
+        if pos_points is not None:
+            center += pos_points
+        dims = bbox[:, 3:6]
+        corners_norm = torch.stack([
+            torch.Tensor([0.5, 0.5, 0.5]),
+            torch.Tensor([0.5, 0.5, -0.5]),
+            torch.Tensor([0.5, -0.5, 0.5]),
+            torch.Tensor([0.5, -0.5, -0.5]),
+            torch.Tensor([-0.5, 0.5, 0.5]),
+            torch.Tensor( [-0.5, 0.5, -0.5]),
+            torch.Tensor([-0.5, -0.5, 0.5]),
+            torch.Tensor([-0.5, -0.5, -0.5])            
+        ]).to(device=dims.device, dtype=dims.dtype)
+       
+        corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
+        rotation_matrix = compute_rotation_matrix_from_ortho6d(bbox[:, 6:])
+        corners = rotation_matrix@corners.transpose(1,2)
+        corners = corners.permute(0,2,1) 
+        corners += center.view(-1, 1, 3)
+        corners_center = torch.concat([corners, center.unsqueeze(1)], dim=1)
+        """
+        #NOTE: Enable gradient tracking
+        corners.requires_grad_(True)
+
+        def hook_fn(grad):
+            print('Gradients passing through bbox_to_corners:', grad)
+
+        # Register the hook to the tensor
+        corners.register_hook(hook_fn)
+        """
+        return corners_center
+    
     @staticmethod
     def _bbox_to_loss(bbox):
         """Transform box to the axis-aligned or rotated iou loss format.
@@ -101,6 +168,7 @@ class TR3DHead(BaseModule):
         Returns:
             Tensor: Transformed 3D box of shape (N, 6) or (N, 7).
         """
+        #TODO: what is going on here?
         if bbox_pred.shape[0] == 0:
             return bbox_pred
 
@@ -118,7 +186,7 @@ class TR3DHead(BaseModule):
         # axis-aligned case
         if bbox_pred.shape[1] == 6:
             return base_bbox
-
+        
         # rotated case: ..., sin(2a)ln(q), cos(2a)ln(q)
         scale = bbox_pred[:, 3] + bbox_pred[:, 4]
         q = torch.exp(
@@ -142,7 +210,7 @@ class TR3DHead(BaseModule):
         bbox_preds = torch.cat(bbox_preds)
         cls_preds = torch.cat(cls_preds)
         points = torch.cat(points)
-
+        
         # cls loss
         n_classes = cls_preds.shape[1]
         pos_mask = assigned_ids >= 0
@@ -152,22 +220,31 @@ class TR3DHead(BaseModule):
         else:
             cls_targets = gt_labels.new_full((len(pos_mask),), n_classes)
         cls_loss = self.cls_loss(cls_preds, cls_targets)
-
+        
         # bbox loss
         pos_bbox_preds = bbox_preds[pos_mask]
         if pos_mask.sum() > 0:
             pos_points = points[pos_mask]
             pos_bbox_preds = bbox_preds[pos_mask]
-            bbox_targets = torch.cat((gt_bboxes.gravity_center, gt_bboxes.tensor[:, 3:]), dim=1)
+            bbox_targets = torch.cat((gt_bboxes.tensor[:,:3], gt_bboxes.tensor[:, 3:]), dim=1)
             pos_bbox_targets = bbox_targets.to(points.device)[assigned_ids][pos_mask]
-            if pos_bbox_preds.shape[1] == 6:
-                pos_bbox_targets = pos_bbox_targets[:, :6]
+
+            # if pos_bbox_preds.shape[1] == 6:
+            #     pos_bbox_targets = pos_bbox_targets[:, :6]
+
+            # bbox_loss = self.bbox_loss(
+            #     self._bbox_to_loss(
+            #         self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
+            #     self._bbox_to_loss(pos_bbox_targets)) 
+            # print(points)
             bbox_loss = self.bbox_loss(
-                self._bbox_to_loss(
-                    self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
-                self._bbox_to_loss(pos_bbox_targets))            
+            self.bbox_to_corners(pos_bbox_preds, pos_points),
+            self.bbox_to_corners(pos_bbox_targets) 
+            )            
+          
         else:
             bbox_loss = None
+        
         return bbox_loss, cls_loss, pos_mask
 
     def _loss(self, bbox_preds, cls_preds, points,
@@ -257,20 +334,40 @@ class TR3DHead(BaseModule):
         return nms_bboxes, nms_scores, nms_labels
 
     def _get_bboxes_single(self, bbox_preds, cls_preds, points, img_meta):
+
         scores = torch.cat(cls_preds).sigmoid()
         bbox_preds = torch.cat(bbox_preds)
         points = torch.cat(points)
         max_scores, _ = scores.max(dim=1)
+        labels = []
+        n_classes = scores.shape[1]
+        for i in range(n_classes):
+            labels.append(
+                bbox_preds.new_full(
+                    scores.shape, i, dtype=torch.long))
+        labels = torch.cat(labels, dim=0)
 
-        if len(scores) > self.test_cfg.nms_pre > 0:
-            _, ids = max_scores.topk(self.test_cfg.nms_pre)
-            bbox_preds = bbox_preds[ids]
-            scores = scores[ids]
-            points = points[ids]
-
-        boxes = self._bbox_pred_to_bbox(points, bbox_preds)
-        boxes, scores, labels = self._nms(boxes, scores, img_meta)
-        return boxes, scores, labels
+        # if len(scores) > self.test_cfg.nms_pre > 0:
+        #     _, ids = max_scores.topk(self.test_cfg.nms_pre)
+        #     bbox_preds = bbox_preds[ids]
+        #     scores = scores[ids]
+        #     points = points[ids]
+        #     labels = labels[ids]
+        
+        # boxes = self._bbox_pred_to_bbox(points, bbox_preds)
+        
+        # print(points)
+        boxes_corners = self.bbox_to_corners(bbox_preds, points)
+        
+        #TODO: Need to fix NMS for 3d
+        # import pdb; pdb.set_trace()
+        # boxes, scores, labels = self._nms(boxes, scores, img_meta)
+        # return boxes, scores, labels
+        bbox_preds = img_meta['box_type_3d'](
+            bbox_preds,
+            box_dim=12,
+            with_ortho6d=True)
+        return bbox_preds, scores, labels, boxes_corners
 
     def _get_bboxes(self, bbox_preds, cls_preds, points, img_metas):
         results = []
@@ -302,43 +399,47 @@ class TR3DAssigner:
     @torch.no_grad()
     def assign(self, points, gt_bboxes, gt_labels, img_meta):
         # -> object id or -1 for each point
-        float_max = points[0].new_tensor(1e8)
+        float_max = points[0].new_tensor(1e8) # new tensor 10^8
         levels = torch.cat([points[i].new_tensor(i, dtype=torch.long).expand(len(points[i]))
-                            for i in range(len(points))])
-        points = torch.cat(points)
-        n_points = len(points)
-        n_boxes = len(gt_bboxes)
+                            for i in range(len(points))]) #  levels using size of all points across the indices, i.e if two levels, then 0 and 1 values
+        points = torch.cat(points) #combining points
+        n_points = len(points) 
+        n_boxes = len(gt_bboxes) # number of bboxes, usually the objects in that image scene
 
         if len(gt_labels) == 0:
             return gt_labels.new_full((n_points,), -1)
 
-        boxes = torch.cat((gt_bboxes.gravity_center, gt_bboxes.tensor[:, 3:]), dim=1)
-        boxes = boxes.to(points.device).expand(n_points, n_boxes, 7)
+        boxes = torch.cat((gt_bboxes.tensor[:, :3], gt_bboxes.tensor[:, 3:]), dim=1) #essentially the tensor
+        
+        boxes = boxes.to(points.device).expand(n_points, n_boxes, 12) 
         points = points.unsqueeze(1).expand(n_points, n_boxes, 3)
 
         # condition 1: fix level for label
         label2level = gt_labels.new_tensor(self.label2level)
-        label_levels = label2level[gt_labels].unsqueeze(0).expand(n_points, n_boxes)
-        point_levels = torch.unsqueeze(levels, 1).expand(n_points, n_boxes)
+        label_levels = label2level[gt_labels].unsqueeze(0).expand(n_points, n_boxes) # in our case all 1s
+        point_levels = torch.unsqueeze(levels, 1).expand(n_points, n_boxes) 
         level_condition = label_levels == point_levels
-
+        
         # condition 2: keep topk location per box by center distance
-        center = boxes[..., :3]
-        center_distances = torch.sum(torch.pow(center - points, 2), dim=-1)
-        center_distances = torch.where(level_condition, center_distances, float_max)
+        center = boxes[..., :3] # n_points, n_boxes, 3
+        
+        center_distances = torch.sum(torch.pow(center - points, 2), dim=-1) # sum of square of distances of points from center 
+        center_distances = torch.where(level_condition, center_distances, float_max) #where the label levels and point levels match, calulate this distance
+        
         topk_distances = torch.topk(center_distances,
                                     min(self.top_pts_threshold + 1, len(center_distances)),
-                                    largest=False, dim=0).values[-1]
-        topk_condition = center_distances < topk_distances.unsqueeze(0)
+                                    largest=False, dim=0).values[-1] # k = min(number of points, top pts threshold)
+        
+        topk_condition = center_distances < topk_distances.unsqueeze(0) # wherever the center distances is less that topk distances
 
         # condition 3.0: only closest object to point
         center_distances = torch.sum(torch.pow(center - points, 2), dim=-1)
-        _, min_inds_ = center_distances.min(dim=1)
+        _, min_inds_ = center_distances.min(dim=1) #minimum distance indices of closest center for each point, which bounding  box is nearest to each point
 
         # condition 3: min center distance to box per point
-        center_distances = torch.where(topk_condition, center_distances, float_max)
-        min_values, min_ids = center_distances.min(dim=1)
-        min_inds = torch.where(min_values < float_max, min_ids, -1)
-        min_inds = torch.where(min_inds == min_inds_, min_ids, -1)
+        center_distances = torch.where(topk_condition, center_distances, float_max) # only topk points distances are kept 
+        min_values, min_ids = center_distances.min(dim=1)# then min indices are then calculated considering only top k distances
+        min_inds = torch.where(min_values < float_max, min_ids, -1) 
+        min_inds = torch.where(min_inds == min_inds_, min_ids, -1) # compare to closest center and only retain then
 
         return min_inds

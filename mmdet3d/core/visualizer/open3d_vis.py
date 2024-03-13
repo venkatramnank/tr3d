@@ -104,6 +104,7 @@ def _draw_bboxes(bbox3d,
         elif center_mode == 'camera_bottom':
             center[rot_axis] -= dim[
                 rot_axis] / 2  # bottom center to gravity center
+    
         box3d = geometry.OrientedBoundingBox(center, rot_mat, dim)
 
         line_set = geometry.LineSet.create_from_oriented_bounding_box(box3d)
@@ -228,6 +229,7 @@ def _draw_bboxes_ind(bbox3d,
     bbox3d = bbox3d.copy()
 
     in_box_color = np.array(points_in_box_color)
+ 
     for i in range(len(bbox3d)):
         center = bbox3d[i, 0:3]
         dim = bbox3d[i, 3:6]
@@ -243,6 +245,8 @@ def _draw_bboxes_ind(bbox3d,
         elif center_mode == 'camera_bottom':
             center[rot_axis] -= dim[
                 rot_axis] / 2  # bottom center to gravity center
+        elif center_mode == 'physion':
+            pass
         box3d = geometry.OrientedBoundingBox(center, rot_mat, dim)
 
         line_set = geometry.LineSet.create_from_oriented_bounding_box(box3d)

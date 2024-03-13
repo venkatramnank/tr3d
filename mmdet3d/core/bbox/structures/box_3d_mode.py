@@ -8,6 +8,7 @@ from .base_box3d import BaseInstance3DBoxes
 from .cam_box3d import CameraInstance3DBoxes
 from .depth_box3d import DepthInstance3DBoxes
 from .lidar_box3d import LiDARInstance3DBoxes
+from .physion_box3d import Physion3DBoxes
 from .utils import limit_period
 
 
@@ -56,11 +57,27 @@ class Box3DMode(IntEnum):
 
     The relative coordinate of bottom center in a DEPTH box is (0.5, 0.5, 0),
     and the yaw is around the z axis, thus the rotation axis=2.
+
+
+    Coordinates in Physion mode:
+
+    .. code-block:: none
+
+        up z
+           ^   y front
+           |  /
+           | /
+           0 ------> x right
+
+    The relative coordinate of bottom center in a DEPTH box is (0.5, 0.5, 0),
+    and the yaw is around the z axis, thus the rotation axis=2.
+
     """
 
     LIDAR = 0
     CAM = 1
     DEPTH = 2
+    PHYSION = 3
 
     @staticmethod
     def convert(box, src, dst, rt_mat=None, with_yaw=True):
@@ -89,9 +106,9 @@ class Box3DMode(IntEnum):
         """
         if src == dst:
             return box
-
         is_numpy = isinstance(box, np.ndarray)
         is_Instance3DBoxes = isinstance(box, BaseInstance3DBoxes)
+        is_Physion3DBoxes = isinstance(box, Physion3DBoxes)
         single_box = isinstance(box, (list, tuple))
         if single_box:
             assert len(box) >= 7, (
@@ -104,16 +121,22 @@ class Box3DMode(IntEnum):
                 arr = torch.from_numpy(np.asarray(box)).clone()
             elif is_Instance3DBoxes:
                 arr = box.tensor.clone()
+            elif is_Physion3DBoxes:
+                arr = box.tensor.clone()
             else:
                 arr = box.clone()
 
         if is_Instance3DBoxes:
             with_yaw = box.with_yaw
+        elif is_Physion3DBoxes:
+            with_quaternion = box.with_quaternion
 
         # convert box from `src` mode to `dst` mode.
         x_size, y_size, z_size = arr[..., 3:4], arr[..., 4:5], arr[..., 5:6]
         if with_yaw:
             yaw = arr[..., 6:7]
+        if with_quaternion:
+            quaternion = arr[..., 6:]
         if src == Box3DMode.LIDAR and dst == Box3DMode.CAM:
             if rt_mat is None:
                 rt_mat = arr.new_tensor([[0, -1, 0], [0, 0, -1], [1, 0, 0]])
@@ -193,5 +216,9 @@ class Box3DMode(IntEnum):
                     f'Conversion to {dst} through {original_type}'
                     ' is not supported yet')
             return target_type(arr, box_dim=arr.size(-1), with_yaw=with_yaw)
+        elif is_Physion3DBoxes:
+            if dst == Box3DMode.PHYSION:
+                target_type = Physion3DBoxes
+            return target_type(arr, box_dim=arr.size(-1), with_quaternion=with_quaternion)
         else:
             return arr
