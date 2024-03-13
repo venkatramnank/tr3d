@@ -67,27 +67,31 @@ class RandomDropPointsColor(object):
 
 @PIPELINES.register_module()
 class RandomFlip3DPhysion(object):
-    def __init__(self):
-        self.axes_dict = {0: 'x axis', 2: 'z axis'}
+    def __init__(self, flip_prob = 0.5):
+        self.axes_dict = {1: 'y axis', 2: 'z axis'}
+        self.flip_prob = flip_prob
 
     def random_flip(self, points, gt_bboxes_3d):
         # Randomly choose axes to flip
-        flip_axes = np.random.choice([0, 2], size=1, replace=True)
+        if np.random.rand() < self.flip_prob:
+            flip_axes = np.random.choice([0], size=1, replace=True)
 
-        # Perform flipping for pcd
-        pc = points.copy()
-        for axis in flip_axes:
-            pc.tensor[:, axis] = -pc.tensor[:, axis]
-
-        # negating the center
-        gt_boxes_list = gt_bboxes_3d.tensor.clone()
-        for gt_boxes in gt_boxes_list:
+            # Perform flipping for pcd
+            pc = points.copy()
             for axis in flip_axes:
-                gt_boxes[:3][axis] = -gt_boxes[:3][axis]
-                rotation_matrix = compute_rotation_matrix_from_ortho6d(gt_boxes[6:].reshape(1,6)).squeeze(0)
-                rotation_matrix[axis, :] = - rotation_matrix[axis, :]
-                gt_boxes[6:] = get_ortho6d_from_R(rotation_matrix)
-        
+                pc.tensor[:, axis] = -pc.tensor[:, axis]
+
+            # negating the center
+            gt_boxes_list = gt_bboxes_3d.tensor.clone()
+            for gt_boxes in gt_boxes_list:
+                for axis in flip_axes:
+                    gt_boxes[:3][axis] = -gt_boxes[:3][axis]
+                    rotation_matrix = compute_rotation_matrix_from_ortho6d(gt_boxes[6:].reshape(1,6)).squeeze(0)
+                    rotation_matrix[axis, :] = - rotation_matrix[axis, :]
+                    gt_boxes[6:] = get_ortho6d_from_R(rotation_matrix)
+        else:
+            pc = points
+            gt_boxes_list = gt_bboxes_3d.tensor.clone()  
         return pc, gt_boxes_list
 
     def __call__(self, input_dict):

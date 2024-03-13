@@ -236,7 +236,10 @@ def get_info(data):
     raw_info = data
     with h5py.File(raw_info[1], 'r') as file:
         info = get_phys_dict(file, raw_info[0], raw_info[1], raw_info[2])
-    info['filename'] = os.path.splitext(os.path.basename(raw_info[1]))[0]
+    try:
+        info['filename'] = os.path.splitext(os.path.basename(raw_info[1]))[0]
+    except:
+        return None
     return info
 
 def single_gpu_test(model,
@@ -267,6 +270,8 @@ def single_gpu_test(model,
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, (data, data_infos) in enumerate(zip(data_loader, vars(dataset)['data_infos'])):
         data_infos = get_info(data_infos)
+        if data_infos is None:
+            continue
         gt_data = data_infos['annos']['gt_boxes_upright_depth']
         data['filename'] = data_infos['filename']
         if len(gt_data) == 0:

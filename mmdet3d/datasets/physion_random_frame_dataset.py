@@ -495,6 +495,7 @@ class PhysionRandomFrameDataset(Dataset):
                 - box_type_3d (str): 3D box type.
                 - box_mode_3d (str): 3D box mode.
         """
+        
         results['img_fields'] = []
         results['bbox3d_fields'] = []
         results['pts_mask_fields'] = []
@@ -535,6 +536,8 @@ class PhysionRandomFrameDataset(Dataset):
             dict: Testing data dict of the corresponding index.
         """
         input_dict = self.get_data_info(index)
+        if input_dict is None:
+            return {}
         self.pre_pipeline(input_dict)
         example = self.pipeline(input_dict)
         return example

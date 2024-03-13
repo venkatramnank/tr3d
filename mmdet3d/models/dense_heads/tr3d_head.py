@@ -334,6 +334,7 @@ class TR3DHead(BaseModule):
         return nms_bboxes, nms_scores, nms_labels
 
     def _get_bboxes_single(self, bbox_preds, cls_preds, points, img_meta):
+
         scores = torch.cat(cls_preds).sigmoid()
         bbox_preds = torch.cat(bbox_preds)
         points = torch.cat(points)
