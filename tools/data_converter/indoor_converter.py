@@ -31,7 +31,7 @@ def create_indoor_info_file(data_path,
         f'unsupported indoor dataset {pkl_prefix}'
     save_path = data_path if save_path is None else save_path
     assert os.path.exists(save_path)
-
+    
     # generate infos for both detection and segmentation task
     if pkl_prefix in ['sunrgbd', 'scannet']:
         train_filename = os.path.join(save_path,

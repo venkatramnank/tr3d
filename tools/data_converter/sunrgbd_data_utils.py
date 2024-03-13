@@ -69,8 +69,9 @@ class SUNRGBDData(object):
         split (str, optional): Set split type of the data. Default: 'train'.
         use_v1 (bool, optional): Whether to use v1. Default: False.
     """
-
+    
     def __init__(self, root_path, split='train', use_v1=False):
+        
         self.root_dir = root_path
         self.split = split
         self.split_dir = osp.join(root_path, 'sunrgbd_trainval')
@@ -144,11 +145,13 @@ class SUNRGBDData(object):
         """
 
         def process_single_scene(sample_idx):
+            
             print(f'{self.split} sample_idx: {sample_idx}')
             # convert depth to points
             SAMPLE_NUM = 50000
             # TODO: Check whether can move the point
             #  sampling process during training.
+            
             pc_upright_depth = self.get_depth(sample_idx)
             pc_upright_depth_subsampled = random_sampling(
                 pc_upright_depth, SAMPLE_NUM)

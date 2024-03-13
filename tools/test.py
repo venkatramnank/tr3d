@@ -128,6 +128,7 @@ def parse_args():
 
 
 def main():
+
     args = parse_args()
 
     assert args.out or args.eval or args.format_only or args.show \
@@ -223,10 +224,13 @@ def main():
     elif hasattr(dataset, 'PALETTE'):
         # segmentation dataset has `PALETTE` attribute
         model.PALETTE = dataset.PALETTE
-
+   
     if not distributed:
+        #TODO(venkat) : make sure that visualizations are not shown each time
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
+
         outputs = single_gpu_test(model, data_loader, args.show, args.show_dir)
+
     else:
         model = MMDistributedDataParallel(
             model.cuda(),
@@ -252,7 +256,8 @@ def main():
             ]:
                 eval_kwargs.pop(key, None)
             eval_kwargs.update(dict(metric=args.eval, **kwargs))
-            print(dataset.evaluate(outputs, show=args.show, out_dir=args.show_dir, **eval_kwargs))
+            # print(dataset.evaluate(outputs, show=args.show, out_dir=args.show_dir, **eval_kwargs))
+            print(dataset.evaluate(outputs, **eval_kwargs))        
 
 
 if __name__ == '__main__':
