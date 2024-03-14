@@ -21,7 +21,7 @@ model = dict(
             label2level=[1]),
         bbox_loss=dict(type='CornerBoundingBoxLoss')),
     train_cfg=dict(),
-    test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.01))
+    test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.3))
 
 optimizer = dict(type='AdamW', lr=.001, weight_decay=.0001)
 # optimizer = dict(type='SGD', lr=.001, weight_decay=.0001)
@@ -58,9 +58,9 @@ train_pipeline = [
     #     use_dim=[0, 1, 2, 3, 4, 5]),
     dict(type='LoadAnnotations3D'),
     dict(type='PointSample', num_points=n_points),
-    dict(
-        type='RandomFlip3DPhysion'
-    ),
+    # dict(
+    #     type='RandomFlip3DPhysion'
+    # ),
     # dict(
     #     type='RandomFlip3D',
     #     sync_2d=False,
@@ -103,7 +103,7 @@ data = dict(
     samples_per_gpu=16,
     workers_per_gpu=4,
     persistent_workers=False,
-    num_frames_per_file = 10,
+    num_frames_per_file = 1,
     train=
         dict(
             type=dataset_type,

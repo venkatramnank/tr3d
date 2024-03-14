@@ -15,7 +15,7 @@ from mmdet3d.models.builder import HEADS, build_loss
 from mmdet.core.bbox.builder import BBOX_ASSIGNERS, build_assigner
 from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
 from physion.physion_tools import PointCloudVisualizer, convert_to_world_coords_torch
-# from physion.physion_nms import iou
+from physion.physion_nms import iou_3d, nms_3d_physion
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -237,6 +237,7 @@ class TR3DHead(BaseModule):
             #         self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
             #     self._bbox_to_loss(pos_bbox_targets)) 
             # print(points)
+            
             bbox_loss = self.bbox_loss(
             self.bbox_to_corners(pos_bbox_preds, pos_points),
             self.bbox_to_corners(pos_bbox_targets) 
@@ -332,6 +333,104 @@ class TR3DHead(BaseModule):
             origin=(.5, .5, .5))
 
         return nms_bboxes, nms_scores, nms_labels
+    
+    def _nms_corners(self, bboxes_corners, scores, img_meta, bbox_preds):
+        """Multi-class NMS for a single scene using corner representations.
+        Args:
+            bboxes_corners (Tensor): Predicted boxes in corner representation of shape (N_boxes, 12).
+            scores (Tensor): Predicted scores of shape (N_boxes, N_classes).
+            img_meta (dict): Scene meta data.
+        Returns:
+            Tensor: Predicted bboxes in corner representation.
+            Tensor: Predicted scores.
+            Tensor: Predicted labels.
+        """
+        n_classes = scores.shape[1]
+        nms_bboxes_corners, nms_scores, nms_labels, nms_boxes_pred = [], [], [], []
+        for i in range(n_classes):
+            ids = scores[:, i] > self.test_cfg.score_thr
+            if not ids.any():
+                continue
+
+            class_scores = scores[ids, i]
+            class_bboxes_corners = bboxes_corners[ids][:, :8, :] # not including the center
+            nms_function = self.nms3d_corners
+           
+            nms_ids = nms_function(class_bboxes_corners, class_scores, self.test_cfg.iou_thr)
+            nms_boxes_pred.append(bbox_preds[nms_ids])
+            nms_bboxes_corners.append(class_bboxes_corners[nms_ids])
+            nms_scores.append(class_scores[nms_ids])
+            nms_labels.append(
+                bboxes_corners.new_full(
+                    class_scores[nms_ids].shape, i, dtype=torch.long))
+
+        if len(nms_bboxes_corners):
+            nms_bboxes_corners = torch.cat(nms_bboxes_corners, dim=0)
+            nms_scores = torch.cat(nms_scores, dim=0)
+            nms_labels = torch.cat(nms_labels, dim=0)
+            nms_boxes_pred = torch.cat(nms_boxes_pred, dim=0)
+        else:
+            nms_bboxes_corners = bboxes_corners.new_zeros((0, bboxes_corners.shape[1]))
+            nms_scores = bboxes_corners.new_zeros((0,))
+            nms_labels = bboxes_corners.new_zeros((0,))
+
+        # if yaw_flag:
+        #     box_dim = 12
+        #     with_yaw = True
+        # else:
+        #     raise ValueError("Non-yaw representation not supported for corners.")
+
+        # # Convert corners back to original representation
+        # nms_bboxes = corners_to_bboxes(nms_bboxes_corners)
+
+        return nms_bboxes_corners, nms_scores, nms_labels, nms_boxes_pred
+
+    def _get_bboxes_single_corners(self, bbox_preds_corners, cls_preds, points, img_meta):
+        scores = torch.cat(cls_preds).sigmoid()
+        bbox_preds_corners = torch.cat(bbox_preds_corners)
+        points = torch.cat(points)
+        max_scores, _ = scores.max(dim=1)
+        labels = []
+        n_classes = scores.shape[1]
+        for i in range(n_classes):
+            labels.append(
+                bbox_preds_corners.new_full(
+                    scores.shape, i, dtype=torch.long))
+        labels = torch.cat(labels, dim=0)
+
+        boxes_corners = bbox_preds_corners  # Assuming bbox_preds_corners are already in corner representation
+
+        boxes, scores, labels = self._nms_corners(boxes_corners, scores, img_meta)
+        return boxes, scores, labels
+
+    def nms3d_corners(self, boxes_corners, scores, iou_threshold: float):
+        """3D NMS function using corners representation."""
+        assert boxes_corners.size(1) == 8, 'Input boxes corners shape should be (N, 8, 3)'
+        order = scores.sort(0, descending=True)[1]
+        boxes_corners = boxes_corners[order].contiguous()
+        desired_order = torch.LongTensor([6, 2, 1, 5, 7, 3, 0, 4]).to(boxes_corners.device)
+        rearranged_boxes_corners = torch.index_select(boxes_corners, dim=1, index=desired_order)
+        try:
+            intersection_vol, iou_3d_vals = iou_3d(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)
+        except ValueError:
+            import pdb; pdb.set_trace()
+        keep = torch.ones(scores.size(0), dtype=torch.bool, device=boxes_corners.device)
+
+        # Iterate over each box
+        for i in range(scores.size(0)):
+            if keep[i]:
+                # For each box, compare its IoU with all other boxes
+                for j in range(i + 1, scores.size(0)):
+                    if iou_3d_vals[i, j] > iou_threshold:
+                        # If IoU exceeds threshold, discard box with lower score
+                        if scores[i] < scores[j]:
+                            keep[i] = False
+                        else:
+                            keep[j] = False
+
+        # Filter out indices of boxes to keep
+        keep_indices = order[keep].contiguous()
+        return keep_indices
 
     def _get_bboxes_single(self, bbox_preds, cls_preds, points, img_meta):
         scores = torch.cat(cls_preds).sigmoid()
@@ -359,7 +458,7 @@ class TR3DHead(BaseModule):
         boxes_corners = self.bbox_to_corners(bbox_preds, points)
         
         #TODO: Need to fix NMS for 3d
-        # import pdb; pdb.set_trace()
+        boxes_corners, scores, labels, bbox_preds = self._nms_corners(boxes_corners, scores, img_meta, bbox_preds)
         # boxes, scores, labels = self._nms(boxes, scores, img_meta)
         # return boxes, scores, labels
         bbox_preds = img_meta['box_type_3d'](

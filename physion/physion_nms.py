@@ -99,7 +99,7 @@
 from pytorch3d.ops import box3d_overlap
 import torch
 
-def iou_3d(boxes1, boxes2):
+def iou_3d(boxes1, boxes2, eps):
     """Non differentiable 3d overlap for calculation of IOU using  
     https://pytorch3d.org/docs/iou3d
  
@@ -107,11 +107,11 @@ def iou_3d(boxes1, boxes2):
         box1 (tensor): box1 of shape (M,8,3)
         box2 (tensor): box2 of shape (N,8,3)
     """
-    intersection_vol, iou_3d = box3d_overlap(boxes1, boxes2)
+    intersection_vol, iou_3d = box3d_overlap(boxes1, boxes2, eps)
     return intersection_vol, iou_3d # M x N shape 
 
 
-def nms_3d(bboxes, iou_threshold, score_threshold, scores):
+def nms_3d_physion(bboxes, iou_threshold, score_threshold, scores):
     import pdb; pdb.set_trace()
     n_classes = scores.shape[1]
     nms_bboxes, nms_scores, nms_labels = [], [], []

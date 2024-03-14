@@ -535,6 +535,8 @@ class PhysionRandomFrameDataset(Dataset):
             dict: Testing data dict of the corresponding index.
         """
         input_dict = self.get_data_info(index)
+        if input_dict is None:
+            return None
         self.pre_pipeline(input_dict)
         example = self.pipeline(input_dict)
         return example
@@ -769,3 +771,57 @@ class PhysionRandomFrameDataset(Dataset):
             file_client_args=self.file_client_args
         )
         return copied_dataset
+    
+
+    def evaluate(self,
+                 results,
+                 metric=None,
+                 iou_thr=(0.25, 0.5),
+                 iou_thr_2d=(0.5, ),
+                 logger=None,
+                 show=False,
+                 out_dir=None,
+                 pipeline=None):
+        """Evaluate.
+
+        Evaluation in indoor protocol.
+
+        Args:
+            results (list[dict]): List of results.
+            metric (str | list[str], optional): Metrics to be evaluated.
+                Default: None.
+            iou_thr (list[float], optional): AP IoU thresholds for 3D
+                evaluation. Default: (0.25, 0.5).
+            iou_thr_2d (list[float], optional): AP IoU thresholds for 2D
+                evaluation. Default: (0.5, ).
+            show (bool, optional): Whether to visualize.
+                Default: False.
+            out_dir (str, optional): Path to save the visualization results.
+                Default: None.
+            pipeline (list[dict], optional): raw data loading for showing.
+                Default: None.
+
+        Returns:
+            dict: Evaluation results.
+        """
+        import pdb; pdb.set_trace()
+        # evaluate 3D detection performance
+        if isinstance(results[0], dict):
+            return super().evaluate(results, metric, iou_thr, logger, show,
+                                    out_dir, pipeline)
+        # evaluate 2D detection performance
+        else:
+            eval_results = OrderedDict()
+            annotations = [self.get_ann_info(i) for i in range(len(self))]
+            iou_thr_2d = (iou_thr_2d) if isinstance(iou_thr_2d,
+                                                    float) else iou_thr_2d
+            for iou_thr_2d_single in iou_thr_2d:
+                mean_ap, _ = eval_map(
+                    results,
+                    annotations,
+                    scale_ranges=None,
+                    iou_thr=iou_thr_2d_single,
+                    dataset=self.CLASSES,
+                    logger=logger)
+                eval_results['mAP_' + str(iou_thr_2d_single)] = mean_ap
+            return eval_results
