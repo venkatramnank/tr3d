@@ -23,7 +23,7 @@ from scipy.spatial.transform import Rotation as R
 from physion.external.rotation_continuity.utils import get_ortho6d_from_R, compute_rotation_matrix_from_ortho6d_np
 
 global_object_types = set()
-CRUCIAL_OBJECTS = [b'cloth_square', b'buddah', b'bowl', b'cone', b'cube', b'cylinder', b'dumbbell', b'octahedron', b'pentagon', b'pipe', b'platonic', b'pyramid', b'sphere', b'torus', b'triangular_prism']
+CRUCIAL_OBJECTS = [b'bowl', b'cone', b'cube', b'cylinder', b'dumbbell', b'octahedron', b'pentagon', b'pipe', b'platonic', b'pyramid', b'sphere', b'torus', b'triangular_prism']
 CRUCIAL_OBJECTS_CLASS = {element:index for index, element in enumerate(CRUCIAL_OBJECTS)}
 
 def parse_args():
@@ -383,7 +383,7 @@ def get_phys_dict(file, img_idx, _file,_file_idx, frame_id):
         if obj_name not in CRUCIAL_OBJECTS:
             continue
 
-
+        
         seg_color = s_obj["object_segmentation_colors"][seg_id]
         # object_name = s_obj['model_names'][seg_id].decode('utf-8')
         # Adding to the set in order to see different types of objects

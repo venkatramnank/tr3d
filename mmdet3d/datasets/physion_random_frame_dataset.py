@@ -220,7 +220,6 @@ class PhysionRandomFrameDataset(Dataset):
             if obj_name not in CRUCIAL_OBJECTS:
                 continue
 
-
             seg_color = s_obj["object_segmentation_colors"][seg_id]
             # object_name = s_obj['model_names'][seg_id].decode('utf-8')
             # Adding to the set in order to see different types of objects
@@ -281,6 +280,9 @@ class PhysionRandomFrameDataset(Dataset):
                 return [length, width, height]
             # import pdb; pdb.set_trace()
             bbox_3d_dims = calculate_bounding_box_dimensions(points)
+            if bbox_3d_dims[2] < 0.1: continue # based on height remove carpet
+
+           
             dimensions_list.append([bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[2]])
                 
             yaw = math.atan2(2.0*(y*z + x*y), w*w + x*x - y*y - z*z)
@@ -516,7 +518,7 @@ class PhysionRandomFrameDataset(Dataset):
         """
         input_dict = self.get_data_info(index)
         if input_dict is None:
-            return None
+            return {}
         self.pre_pipeline(input_dict)
         example = self.pipeline(input_dict)
         if self.filter_empty_gt and \
@@ -536,7 +538,7 @@ class PhysionRandomFrameDataset(Dataset):
         """
         input_dict = self.get_data_info(index)
         if input_dict is None:
-            return None
+            return {}
         self.pre_pipeline(input_dict)
         example = self.pipeline(input_dict)
         return example
