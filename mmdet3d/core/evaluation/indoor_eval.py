@@ -69,7 +69,7 @@ def eval_det_cls(pred, gt, iou_thr=None):
     """
 
     # {img_id: {'bbox': box structure, 'det': matched list}}
-    import pdb; pdb.set_trace()
+
     class_recs = {}
     npos = 0
     for img_id in gt.keys():
@@ -178,7 +178,6 @@ def eval_map_recall(pred, gt, ovthresh=None):
     Return:
         tuple[dict]: dict results of recall, AP, and precision for all classes.
     """
-
     ret_values = {}
     for classname in gt.keys():
         if classname in pred:
@@ -249,9 +248,14 @@ def indoor_eval(gt_annos,
             if img_id not in gt[label]:
                 gt[int(label)][img_id] = []
             pred[int(label)][img_id].append((bbox, score))
-
         # parse gt annotations
         gt_anno = gt_annos[img_id]
+        # if len(gt_anno['gt_labels_3d']) > 0:
+        #     gt_boxes = gt_anno['gt_bboxes_3d']
+        #     labels_3d = gt_anno['gt_labels_3d']
+        # else:
+        #     gt_boxes = box_type_3d(np.array([], dtype=np.float32))
+        #     labels_3d = np.array([], dtype=np.int64)
         if gt_anno['gt_num'] != 0:
             gt_boxes = box_type_3d(
                 gt_anno['gt_boxes_upright_depth'],
@@ -270,7 +274,7 @@ def indoor_eval(gt_annos,
             if img_id not in gt[label]:
                 gt[label][img_id] = []
             gt[label][img_id].append(bbox)
-    
+
     rec, prec, ap = eval_map_recall(pred, gt, metric)
     ret_dict = dict()
     header = ['classes']
@@ -340,7 +344,7 @@ def indoor_eval_physion(gt_annos,
     Return:
         dict[str, float]: Dict of results.
     """
-    
+
     assert len(dt_annos) == len(gt_annos)
     pred = {}  # map {class_id: pred}
     gt = {}  # map {class_id: gt}
@@ -350,6 +354,7 @@ def indoor_eval_physion(gt_annos,
             label = det_anno['labels_3d'].numpy()[i]
             bbox = det_anno['boxes_3d'].convert_to(box_mode_3d)[i]
             score = det_anno['scores_3d'].numpy()[i]
+
             if int(label) not in pred:
                 pred[int(label)] = {}
             if img_id not in pred[int(label)]:
@@ -361,15 +366,21 @@ def indoor_eval_physion(gt_annos,
             pred[int(label)][img_id].append((bbox, score))
 
         gt_anno = gt_annos[img_id]
-        if gt_anno['gt_num'] != 0:
-            gt_boxes = box_type_3d(
-                gt_anno['gt_boxes_upright_depth'],
-                box_dim=gt_anno['gt_boxes_upright_depth'].shape[-1],
-                ).convert_to(box_mode_3d)
-            labels_3d = gt_anno['class']
+        if len(gt_anno['gt_labels_3d']) > 0:
+            gt_boxes = gt_anno['gt_bboxes_3d']
+            labels_3d = gt_anno['gt_labels_3d']
         else:
             gt_boxes = box_type_3d(np.array([], dtype=np.float32))
             labels_3d = np.array([], dtype=np.int64)
+        # if gt_anno['gt_num'] != 0:
+        #     gt_boxes = box_type_3d(
+        #         gt_anno['gt_boxes_upright_depth'],
+        #         box_dim=gt_anno['gt_boxes_upright_depth'].shape[-1],
+        #         origin=(0.5, 0.5, 0.5)).convert_to(box_mode_3d)
+        #     labels_3d = gt_anno['class']
+        # else:
+        #     gt_boxes = box_type_3d(np.array([], dtype=np.float32))
+        #     labels_3d = np.array([], dtype=np.int64)
 
         for i in range(len(labels_3d)):
             label = labels_3d[i]

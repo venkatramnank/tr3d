@@ -30,7 +30,7 @@ def main():
 
     directories = sys.argv[1]
     file_info_list = process_directory(directories)
-
+    import pdb; pdb.set_trace()
     # Randomly shuffle the list
     random.shuffle(file_info_list)
 

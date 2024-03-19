@@ -9,7 +9,7 @@ from .base_box3d import BaseInstance3DBoxes
 from .utils import rotation_3d_in_axis
 from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
 from physion.physion_tools import canonical_to_world
-
+from physion.physion_nms import iou_3d
 
 class Physion3DBoxes(object):
     def __init__(self, tensor, box_dim = 12, with_ortho6d=True, origin=(0.5, 0.5, 0)):
@@ -131,6 +131,7 @@ class Physion3DBoxes(object):
     #     corners += self.bottom_center.view(-1, 1, 3)
     #     return corners
     
+
     
     @property 
     def corners(self):
@@ -387,3 +388,13 @@ class Physion3DBoxes(object):
             box_dim=self.box_dim,
             with_ortho6d=self.with_ortho6d
         )
+        
+    @classmethod
+    def overlaps(self, boxes1, boxes2, mode='iou'):
+        assert isinstance(boxes1, Physion3DBoxes)
+        assert isinstance(boxes2, Physion3DBoxes)
+        assert type(boxes1) == type(boxes2)
+        
+        _, iou = iou_3d(boxes1.corners, boxes2.corners, eps=1e-6)
+        
+        return iou

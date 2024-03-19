@@ -410,6 +410,7 @@ class TR3DHead(BaseModule):
         boxes_corners = boxes_corners[order].contiguous()
         desired_order = torch.LongTensor([6, 2, 1, 5, 7, 3, 0, 4]).to(boxes_corners.device)
         rearranged_boxes_corners = torch.index_select(boxes_corners, dim=1, index=desired_order)
+        # filterd_rearranged_boxes_corners = 
         try:
             intersection_vol, iou_3d_vals = iou_3d(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)
         except ValueError:
@@ -417,16 +418,19 @@ class TR3DHead(BaseModule):
         keep = torch.ones(scores.size(0), dtype=torch.bool, device=boxes_corners.device)
 
         # Iterate over each box
-        for i in range(scores.size(0)):
-            if keep[i]:
-                # For each box, compare its IoU with all other boxes
-                for j in range(i + 1, scores.size(0)):
-                    if iou_3d_vals[i, j] > iou_threshold:
-                        # If IoU exceeds threshold, discard box with lower score
-                        if scores[i] < scores[j]:
-                            keep[i] = False
-                        else:
-                            keep[j] = False
+        try:
+            for i in range(scores.size(0)):
+                if keep[i]:
+                    # For each box, compare its IoU with all other boxes
+                    for j in range(i + 1, scores.size(0)):
+                        if iou_3d_vals[i, j] > iou_threshold:
+                            # If IoU exceeds threshold, discard box with lower score
+                            if scores[i] < scores[j]:
+                                keep[i] = False
+                            else:
+                                keep[j] = False
+        except RuntimeError:
+            import pdb; pdb.set_trace()
 
         # Filter out indices of boxes to keep
         keep_indices = order[keep].contiguous()

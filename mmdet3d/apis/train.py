@@ -141,6 +141,7 @@ def train_segmentor(model,
 
     # register eval hooks
     if validate:
+        import pdb; pdb.set_trace()
         val_dataset = build_dataset(cfg.data.val, dict(test_mode=True))
         val_dataloader = build_mmseg_dataloader(
             val_dataset,
@@ -153,6 +154,7 @@ def train_segmentor(model,
         eval_hook = MMSEG_DistEvalHook if distributed else MMSEG_EvalHook
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
+        
         runner.register_hook(
             eval_hook(val_dataloader, **eval_cfg), priority='LOW')
 
@@ -287,6 +289,7 @@ def train_detector(model,
 
     # register eval hooks
     if validate:
+        
         # Support batch_size > 1 in validation
         val_samples_per_gpu = cfg.data.val.pop('samples_per_gpu', 1)
         if val_samples_per_gpu > 1:
@@ -306,7 +309,7 @@ def train_detector(model,
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
         runner.register_hook(
-            eval_hook(val_dataloader, **eval_cfg), priority='LOW')
+            eval_hook(val_dataloader, interval=2, **eval_cfg), priority='LOW')
 
     resume_from = None
     if cfg.resume_from is None and cfg.get('auto_resume'):

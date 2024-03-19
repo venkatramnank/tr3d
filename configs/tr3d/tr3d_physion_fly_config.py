@@ -101,9 +101,9 @@ test_pipeline = [
 ]
 data = dict(
     samples_per_gpu=16,
-    workers_per_gpu=0,
+    workers_per_gpu=4,
     persistent_workers=False,
-    num_frames_per_file = 1,
+    num_frames_per_file = 10,
     train=
         dict(
             type=dataset_type,
@@ -118,7 +118,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'val_onthefly_data.pkl',
+        ann_file=data_root + 'val_onthefly_data_small.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,

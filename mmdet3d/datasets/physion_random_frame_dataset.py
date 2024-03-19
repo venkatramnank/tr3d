@@ -280,7 +280,7 @@ class PhysionRandomFrameDataset(Dataset):
                 return [length, width, height]
             # import pdb; pdb.set_trace()
             bbox_3d_dims = calculate_bounding_box_dimensions(points)
-            if bbox_3d_dims[2] < 0.1: continue # based on height remove carpet
+            if bbox_3d_dims[2] < 0.1 or bbox_3d_dims[0] < 0.1 or bbox_3d_dims[1] < 0.1: continue # based on height/width/length remove carpet
 
            
             dimensions_list.append([bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[2]])
@@ -369,9 +369,44 @@ class PhysionRandomFrameDataset(Dataset):
         return mmcv.load(ann_file, file_format='pkl')
 
 
+    def get_gt_data_info(self, index):
+        raw_info = self.data_infos[index]
+        with h5py.File(raw_info[1], 'r') as file:
+            info = self.get_phys_dict(file, raw_info[0], raw_info[1], raw_info[2])
+        if info is None: return
+        sample_idx = info['point_cloud']['lidar_idx']
+        # assert info['point_cloud']['lidar_idx'] == info['image']['image_idx']
+        input_dict = dict(sample_idx=sample_idx)
+        input_dict['file_info'] = info['file_info']
+        if self.modality['use_lidar']:
+            # pts_filename = osp.join(self.data_root, info['pts_path'])
+            input_dict['points'] =  self._points_class_builder(info['points'])
+            # input_dict['pts_filename'] = pts_filename
+            # input_dict['file_name'] = pts_filename
+
+
+        # if self.modality['use_camera']:
+        #     img_filename = osp.join(
+        #         osp.join(self.data_root, 'sunrgbd_trainval'),
+        #         info['image']['image_path'])
+        #     input_dict['img_prefix'] = None
+        #     input_dict['img_info'] = dict(filename=img_filename)
+        #     calib = info['calib']
+        #     rt_mat = calib['Rt']
+        #     # follow Coord3DMode.convert_point
+        #     rt_mat = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]
+        #                        ]) @ rt_mat.transpose(1, 0)
+        #     depth2img = calib['K'] @ rt_mat
+        #     input_dict['depth2img'] = depth2img
+
+    
+        annos = self.get_ann_info(index)
+        input_dict['ann_info'] = annos
+        if self.filter_empty_gt and len(annos['gt_bboxes_3d']) == 0:
+            return None
+        return input_dict
     
     def get_data_info(self, index):
-        #TODO: reuse the data_infos
         """Get data info according to the given index.
 
         Args:
@@ -518,7 +553,7 @@ class PhysionRandomFrameDataset(Dataset):
         """
         input_dict = self.get_data_info(index)
         if input_dict is None:
-            return {}
+            return None
         self.pre_pipeline(input_dict)
         example = self.pipeline(input_dict)
         if self.filter_empty_gt and \
@@ -632,7 +667,12 @@ class PhysionRandomFrameDataset(Dataset):
         assert isinstance(
             results[0], dict
         ), f'Expect elements in results to be dict, got {type(results[0])}.'
-        gt_annos = [info['annos'] for info in self.data_infos]
+        gt_annos = []
+
+        for i in range(len(self.data_infos)):
+            gt_annos.append(self.get_gt_data_info(i)['ann_info'])
+        # gt_annos = [info['annos'] for info in self.data_infos]
+
         label2cat = {i: cat_id for i, cat_id in enumerate(self.CLASSES)}
         # ret_dict = indoor_eval(
         #     gt_annos,
@@ -734,9 +774,6 @@ class PhysionRandomFrameDataset(Dataset):
         Returns:
             dict: Data dictionary of the corresponding index.
         """
-        #TODO: store the files in [index, name, frame id] in a pkl file and load it here as annotation data
-        #TODO: Then change parts where we extract on the fly (do it quick!!!)
-        
         if self.test_mode:
             return self.prepare_test_data(idx)
         while True:
@@ -775,55 +812,3 @@ class PhysionRandomFrameDataset(Dataset):
         return copied_dataset
     
 
-    def evaluate(self,
-                 results,
-                 metric=None,
-                 iou_thr=(0.25, 0.5),
-                 iou_thr_2d=(0.5, ),
-                 logger=None,
-                 show=False,
-                 out_dir=None,
-                 pipeline=None):
-        """Evaluate.
-
-        Evaluation in indoor protocol.
-
-        Args:
-            results (list[dict]): List of results.
-            metric (str | list[str], optional): Metrics to be evaluated.
-                Default: None.
-            iou_thr (list[float], optional): AP IoU thresholds for 3D
-                evaluation. Default: (0.25, 0.5).
-            iou_thr_2d (list[float], optional): AP IoU thresholds for 2D
-                evaluation. Default: (0.5, ).
-            show (bool, optional): Whether to visualize.
-                Default: False.
-            out_dir (str, optional): Path to save the visualization results.
-                Default: None.
-            pipeline (list[dict], optional): raw data loading for showing.
-                Default: None.
-
-        Returns:
-            dict: Evaluation results.
-        """
-        import pdb; pdb.set_trace()
-        # evaluate 3D detection performance
-        if isinstance(results[0], dict):
-            return super().evaluate(results, metric, iou_thr, logger, show,
-                                    out_dir, pipeline)
-        # evaluate 2D detection performance
-        else:
-            eval_results = OrderedDict()
-            annotations = [self.get_ann_info(i) for i in range(len(self))]
-            iou_thr_2d = (iou_thr_2d) if isinstance(iou_thr_2d,
-                                                    float) else iou_thr_2d
-            for iou_thr_2d_single in iou_thr_2d:
-                mean_ap, _ = eval_map(
-                    results,
-                    annotations,
-                    scale_ranges=None,
-                    iou_thr=iou_thr_2d_single,
-                    dataset=self.CLASSES,
-                    logger=logger)
-                eval_results['mAP_' + str(iou_thr_2d_single)] = mean_ap
-            return eval_results

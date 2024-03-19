@@ -12,7 +12,7 @@ def process_directory(directory):
     # Iterate and count frames in HDF5 files
     
     for root, dirs, files in os.walk(directory):
-        for file in files:
+        for file in files[:10]:
             if file.endswith('.hdf5') and 'towers' in file:
                 file_path = os.path.join(root, file)
                 with h5py.File(file_path, 'r') as f:
@@ -40,10 +40,10 @@ def main():
     val_data = file_info_list[split_index:]
     parent_directory = os.path.dirname(directories)
     # Save train and validation sets as pickle files
-    with open(parent_directory + '/train_onthefly_data.pkl', 'wb') as train_file:
+    with open(parent_directory + '/train_onthefly_data_small.pkl', 'wb') as train_file:
         pickle.dump(train_data, train_file)
 
-    with open(parent_directory + '/val_onthefly_data.pkl', 'wb') as val_file:
+    with open(parent_directory + '/val_onthefly_data_small.pkl', 'wb') as val_file:
         pickle.dump(val_data, val_file)
 
 if __name__ == "__main__":
