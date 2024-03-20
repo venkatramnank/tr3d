@@ -15,7 +15,7 @@ from mmdet3d.models.builder import HEADS, build_loss
 from mmdet.core.bbox.builder import BBOX_ASSIGNERS, build_assigner
 from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
 from physion.physion_tools import PointCloudVisualizer, convert_to_world_coords_torch
-from physion.physion_nms import iou_3d, nms_3d_physion
+from physion.physion_nms import *
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -385,23 +385,23 @@ class TR3DHead(BaseModule):
 
         return nms_bboxes_corners, nms_scores, nms_labels, nms_boxes_pred
 
-    def _get_bboxes_single_corners(self, bbox_preds_corners, cls_preds, points, img_meta):
-        scores = torch.cat(cls_preds).sigmoid()
-        bbox_preds_corners = torch.cat(bbox_preds_corners)
-        points = torch.cat(points)
-        max_scores, _ = scores.max(dim=1)
-        labels = []
-        n_classes = scores.shape[1]
-        for i in range(n_classes):
-            labels.append(
-                bbox_preds_corners.new_full(
-                    scores.shape, i, dtype=torch.long))
-        labels = torch.cat(labels, dim=0)
+    # def _get_bboxes_single_corners(self, bbox_preds_corners, cls_preds, points, img_meta):
+    #     scores = torch.cat(cls_preds).sigmoid()
+    #     bbox_preds_corners = torch.cat(bbox_preds_corners)
+    #     points = torch.cat(points)
+    #     max_scores, _ = scores.max(dim=1)
+    #     labels = []
+    #     n_classes = scores.shape[1]
+    #     for i in range(n_classes):
+    #         labels.append(
+    #             bbox_preds_corners.new_full(
+    #                 scores.shape, i, dtype=torch.long))
+    #     labels = torch.cat(labels, dim=0)
 
-        boxes_corners = bbox_preds_corners  # Assuming bbox_preds_corners are already in corner representation
+    #     boxes_corners = bbox_preds_corners  # Assuming bbox_preds_corners are already in corner representation
 
-        boxes, scores, labels = self._nms_corners(boxes_corners, scores, img_meta)
-        return boxes, scores, labels
+    #     boxes, scores, labels = self._nms_corners(boxes_corners, scores, img_meta)
+    #     return boxes, scores, labels
 
     def nms3d_corners(self, boxes_corners, scores, iou_threshold: float):
         """3D NMS function using corners representation."""
@@ -410,12 +410,14 @@ class TR3DHead(BaseModule):
         boxes_corners = boxes_corners[order].contiguous()
         desired_order = torch.LongTensor([6, 2, 1, 5, 7, 3, 0, 4]).to(boxes_corners.device)
         rearranged_boxes_corners = torch.index_select(boxes_corners, dim=1, index=desired_order)
-        # filterd_rearranged_boxes_corners = 
+        import pdb; pdb.set_trace()
         try:
-            intersection_vol, iou_3d_vals = iou_3d(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)
+            # intersection_vol, iou_3d_vals = iou_3d(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)
+            _, iou_3d_vals = filtered_box3d_overlap(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)
         except ValueError:
             import pdb; pdb.set_trace()
         keep = torch.ones(scores.size(0), dtype=torch.bool, device=boxes_corners.device)
+        keep &= filter_boxes(rearranged_boxes_corners,eps=1e-6).to(boxes_corners.device)
 
         # Iterate over each box
         try:

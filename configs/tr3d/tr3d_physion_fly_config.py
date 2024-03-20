@@ -58,9 +58,9 @@ train_pipeline = [
     #     use_dim=[0, 1, 2, 3, 4, 5]),
     dict(type='LoadAnnotations3D'),
     dict(type='PointSample', num_points=n_points),
-    # dict(
-    #     type='RandomFlip3DPhysion'
-    # ),
+    dict(
+        type='RandomFlip3DPhysion'
+    ),
     # dict(
     #     type='RandomFlip3D',
     #     sync_2d=False,
@@ -101,9 +101,9 @@ test_pipeline = [
 ]
 data = dict(
     samples_per_gpu=16,
-    workers_per_gpu=4,
+    workers_per_gpu=5,
     persistent_workers=False,
-    num_frames_per_file = 10,
+    num_frames_per_file = 1,
     train=
         dict(
             type=dataset_type,
@@ -118,7 +118,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'val_onthefly_data_small.pkl',
+        ann_file=data_root + 'val_onthefly_data.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
