@@ -226,7 +226,8 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
-        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir)
+        outputs, filenames = single_gpu_test(model, data_loader, args.show, args.show_dir)
+        print('FILE NAMES OUTPUT FOR TEST (only first 10): ',filenames[:10])
     else:
         model = MMDistributedDataParallel(
             model.cuda(),

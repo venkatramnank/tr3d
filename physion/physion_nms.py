@@ -202,7 +202,6 @@ def filter_boxes(boxes,eps):
 
 def filtered_box3d_overlap(boxes1, boxes2, eps=1e-4):
     # Filter boxes1 and boxes2
-    import pdb; pdb.set_trace()
     mask1 = filter_boxes(boxes1,eps=eps)
     mask2 = filter_boxes(boxes2,eps=eps)
     filtered_boxes1 = boxes1[mask1]
@@ -218,7 +217,7 @@ def filtered_box3d_overlap(boxes1, boxes2, eps=1e-4):
     # Construct output tensors with original shape
     vol_output = torch.zeros((len(boxes1), len(boxes2)), dtype=vol.dtype, device=vol.device)
     iou_output = torch.zeros((len(boxes1), len(boxes2)), dtype=iou.dtype, device=iou.device)
-
+    
     vol_output[original_indices1[:, None], original_indices2[None, :]] = vol
     iou_output[original_indices1[:, None], original_indices2[None, :]] = iou
 

@@ -236,6 +236,7 @@ def get_info(data):
     raw_info = data
     with h5py.File(raw_info[1], 'r') as file:
         info = get_phys_dict(file, raw_info[0], raw_info[1], raw_info[2])
+    if info is None: return None
     info['filename'] = os.path.splitext(os.path.basename(raw_info[1]))[0]
     return info
 
@@ -263,12 +264,16 @@ def single_gpu_test(model,
     """
     model.eval()
     results = []
+    filenames = []
+    indices_to_consider =[]
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, (data, data_infos) in enumerate(zip(data_loader, vars(dataset)['data_infos'])):
         data_infos = get_info(data_infos)
+        if data_infos is None and len(data) == 0: continue
         gt_data = data_infos['annos']['gt_boxes_upright_depth']
         data['filename'] = data_infos['filename']
+        filenames.append(data['filename'])
         if len(gt_data) == 0:
             import pdb; pdb.set_trace()
         with torch.no_grad():
@@ -319,8 +324,9 @@ def single_gpu_test(model,
                         out_file=out_file,
                         score_thr=show_score_thr)
         results.extend(result)
+        indices_to_consider.append(i)
 
         batch_size = len(result)
         for _ in range(batch_size):
             prog_bar.update()
-    return results
+    return results, filenames, indices_to_consider

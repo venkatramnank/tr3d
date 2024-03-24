@@ -410,7 +410,6 @@ class TR3DHead(BaseModule):
         boxes_corners = boxes_corners[order].contiguous()
         desired_order = torch.LongTensor([6, 2, 1, 5, 7, 3, 0, 4]).to(boxes_corners.device)
         rearranged_boxes_corners = torch.index_select(boxes_corners, dim=1, index=desired_order)
-        import pdb; pdb.set_trace()
         try:
             # intersection_vol, iou_3d_vals = iou_3d(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)
             _, iou_3d_vals = filtered_box3d_overlap(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)

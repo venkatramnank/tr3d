@@ -22,6 +22,7 @@ from mmdet3d.core.bbox.structures.physion_box3d import Physion3DBoxes
 import multiprocessing
 from tqdm import tqdm
 import concurrent
+from mmdet3d.core.evaluation.indoor_eval import *
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -406,6 +407,131 @@ class PhysionRandomFrameDataset(Dataset):
             return None
         return input_dict
     
+    
+    def indoor_eval_physion(self,gt_annos,
+                    dt_annos,
+                    metric,
+                    label2cat,
+                    logger=None,
+                    box_type_3d=None,
+                    box_mode_3d=None):
+        """Indoor Evaluation modified for physion
+
+        Evaluate the result of the detection.
+
+        Args:
+            gt_annos (list[dict]): Ground truth annotations.
+            dt_annos (list[dict]): Detection annotations. the dict
+                includes the following keys
+
+                - labels_3d (torch.Tensor): Labels of boxes.
+                - boxes_3d (:obj:`BaseInstance3DBoxes`):
+                    3D bounding boxes in Depth coordinate.
+                - scores_3d (torch.Tensor): Scores of boxes.
+            metric (list[float]): IoU thresholds for computing average precisions.
+            label2cat (dict): Map from label to category.
+            logger (logging.Logger | str, optional): The way to print the mAP
+                summary. See `mmdet.utils.print_log()` for details. Default: None.
+
+        Return:
+            dict[str, float]: Dict of results.
+        """
+
+        assert len(dt_annos) == len(gt_annos)
+        pred = {}  # map {class_id: pred}
+        gt = {}  # map {class_id: gt}
+        for img_id in range(len(dt_annos)):
+            det_anno = dt_annos[img_id]
+            gt_anno = gt_annos[img_id]
+            if self.get_gt_data_info(gt_anno) is not None:
+                gt_anno = self.get_gt_data_info(gt_anno)['ann_info']
+            else:
+                continue
+            if gt_anno is None:
+                # import pdb; pdb.set_trace()
+                continue
+            for i in range(len(det_anno['labels_3d'])):
+                label = det_anno['labels_3d'].numpy()[i]
+                bbox = det_anno['boxes_3d'].convert_to(box_mode_3d)[i]
+                score = det_anno['scores_3d'].numpy()[i]
+
+                if int(label) not in pred:
+                    pred[int(label)] = {}
+                if img_id not in pred[int(label)]:
+                    pred[int(label)][img_id] = []
+                if int(label) not in gt:
+                    gt[int(label)] = {}
+                if img_id not in gt[int(label)]:
+                    gt[int(label)][img_id] = []
+                pred[int(label)][img_id].append((bbox, score))
+
+            
+            if len(gt_anno['gt_labels_3d']) > 0:
+                gt_boxes = gt_anno['gt_bboxes_3d']
+                labels_3d = gt_anno['gt_labels_3d']
+            else:
+                gt_boxes = box_type_3d(np.array([], dtype=np.float32))
+                labels_3d = np.array([], dtype=np.int64)
+            # if gt_anno['gt_num'] != 0:
+            #     gt_boxes = box_type_3d(
+            #         gt_anno['gt_boxes_upright_depth'],
+            #         box_dim=gt_anno['gt_boxes_upright_depth'].shape[-1],
+            #         origin=(0.5, 0.5, 0.5)).convert_to(box_mode_3d)
+            #     labels_3d = gt_anno['class']
+            # else:
+            #     gt_boxes = box_type_3d(np.array([], dtype=np.float32))
+            #     labels_3d = np.array([], dtype=np.int64)
+
+            for i in range(len(labels_3d)):
+                label = labels_3d[i]
+                bbox = gt_boxes[i]
+                if label not in gt:
+                    gt[label] = {}
+                if img_id not in gt[label]:
+                    gt[label][img_id] = []
+                gt[label][img_id].append(bbox)
+
+        rec, prec, ap = eval_map_recall(pred, gt, metric)
+        ret_dict = dict()
+        header = ['classes']
+        table_columns = [[label2cat[label]
+                        for label in ap[0].keys()] + ['Overall']]
+
+        for i, iou_thresh in enumerate(metric):
+            header.append(f'AP_{iou_thresh:.2f}')
+            header.append(f'AR_{iou_thresh:.2f}')
+            rec_list = []
+            for label in ap[i].keys():
+                ret_dict[f'{label2cat[label]}_AP_{iou_thresh:.2f}'] = float(
+                    ap[i][label][0])
+            ret_dict[f'mAP_{iou_thresh:.2f}'] = float(
+                np.mean(list(ap[i].values())))
+
+            table_columns.append(list(map(float, list(ap[i].values()))))
+            table_columns[-1] += [ret_dict[f'mAP_{iou_thresh:.2f}']]
+            table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+            for label in rec[i].keys():
+                ret_dict[f'{label2cat[label]}_rec_{iou_thresh:.2f}'] = float(
+                    rec[i][label][-1])
+                rec_list.append(rec[i][label][-1])
+            ret_dict[f'mAR_{iou_thresh:.2f}'] = float(np.mean(rec_list))
+
+            table_columns.append(list(map(float, rec_list)))
+            table_columns[-1] += [ret_dict[f'mAR_{iou_thresh:.2f}']]
+            table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+        table_data = [header]
+        table_rows = list(zip(*table_columns))
+        table_data += table_rows
+        table = AsciiTable(table_data)
+        table.inner_footing_row_border = True
+        print_log('\n' + table.table, logger=logger)
+
+        return ret_dict
+    
+    
+    
     def get_data_info(self, index):
         """Get data info according to the given index.
 
@@ -562,6 +688,11 @@ class PhysionRandomFrameDataset(Dataset):
             return None
         return example
 
+    
+    def get_gt_annos(self, index):
+        gt_data_info = self.get_gt_data_info(index)
+        return gt_data_info['ann_info'] if gt_data_info is not None else None
+    
     def prepare_test_data(self, index):
         """Prepare data for testing.
 
@@ -631,6 +762,7 @@ class PhysionRandomFrameDataset(Dataset):
 
     def evaluate(self,
                  results,
+                 indices_to_consider,
                  metric=None,
                  iou_thr=(0.25, 0.5),
                  logger=None,
@@ -658,21 +790,22 @@ class PhysionRandomFrameDataset(Dataset):
         Returns:
             dict: Evaluation results.
         """
-        from mmdet3d.core.evaluation import indoor_eval
-        from mmdet3d.core.evaluation.indoor_eval import indoor_eval_physion
+        # from mmdet3d.core.evaluation import indoor_eval
+        # from mmdet3d.core.evaluation.indoor_eval import indoor_eval_physion
         assert isinstance(
             results, list), f'Expect results to be list, got {type(results)}.'
         assert len(results) > 0, 'Expect length of results > 0.'
-        assert len(results) == len(self.data_infos)
+        # import pdb; pdb.set_trace()
+        # if len(results) != len(self.data_infos): import pdb; pdb.set_trace()
+        
         assert isinstance(
             results[0], dict
         ), f'Expect elements in results to be dict, got {type(results[0])}.'
-        gt_annos = []
-
-        for i in range(len(self.data_infos)):
-            gt_annos.append(self.get_gt_data_info(i)['ann_info'])
+        gt_annos = indices_to_consider
+        # for i in range(len(self.data_infos)):
+        #     gt_annos.append(i)
         # gt_annos = [info['annos'] for info in self.data_infos]
-
+        assert len(results) == len(indices_to_consider)
         label2cat = {i: cat_id for i, cat_id in enumerate(self.CLASSES)}
         # ret_dict = indoor_eval(
         #     gt_annos,
@@ -682,7 +815,7 @@ class PhysionRandomFrameDataset(Dataset):
         #     logger=logger,
         #     box_type_3d=self.box_type_3d,
         #     box_mode_3d=self.box_mode_3d)
-        ret_dict = indoor_eval_physion(
+        ret_dict = self.indoor_eval_physion(
             gt_annos,
             results,
             iou_thr,

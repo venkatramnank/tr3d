@@ -4,7 +4,6 @@ import torch
 from mmcv.utils import print_log
 from terminaltables import AsciiTable
 
-
 def average_precision(recalls, precisions, mode='area'):
     """Calculate average precision (for single or multiple scales).
 
@@ -112,7 +111,6 @@ def eval_det_cls(pred, gt, iou_thr=None):
                 ious.append(np.zeros(1))
 
     confidence = np.array(confidence)
-    import pdb; pdb.set_trace()
     # sort by confidence
     sorted_ind = np.argsort(-confidence)
     image_ids = [image_ids[x] for x in sorted_ind]
@@ -127,7 +125,6 @@ def eval_det_cls(pred, gt, iou_thr=None):
         iou_max = -np.inf
         BBGT = R['bbox']
         cur_iou = ious[d]
-        import pdb; pdb.set_trace()
         if len(BBGT) > 0:
             # compute overlaps
             for j in range(len(BBGT)):
@@ -136,7 +133,6 @@ def eval_det_cls(pred, gt, iou_thr=None):
                 if iou > iou_max:
                     iou_max = iou
                     jmax = j
-        import pdb; pdb.set_trace()
         for iou_idx, thresh in enumerate(iou_thr):
             if iou_max > thresh:
                 if not R['det'][iou_idx][jmax]:

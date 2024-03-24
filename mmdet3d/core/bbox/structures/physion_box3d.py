@@ -394,7 +394,11 @@ class Physion3DBoxes(object):
         assert isinstance(boxes1, Physion3DBoxes)
         assert isinstance(boxes2, Physion3DBoxes)
         assert type(boxes1) == type(boxes2)
-        
-        _, iou = iou_3d(boxes1.corners, boxes2.corners, eps=1e-6)
+        boxes1_corners = boxes1.corners
+        boxes2_corners = boxes2.corners
+        desired_order = torch.index_select([[6, 2, 1, 5, 7, 3, 0, 4]]).to(boxes1.device)
+        rearranged_boxes1_corners = torch.index_select(boxes1_corners, dim=1, index=desired_order)
+        rearranged_boxes2_corners = torch.index_select(boxes2_corners, dim=1, index=desired_order)
+        _, iou = iou_3d(rearranged_boxes1_corners, rearranged_boxes2_corners, eps=1e-6)
         
         return iou

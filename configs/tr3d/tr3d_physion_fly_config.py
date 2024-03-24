@@ -103,7 +103,7 @@ data = dict(
     samples_per_gpu=16,
     workers_per_gpu=5,
     persistent_workers=False,
-    num_frames_per_file = 1,
+    num_frames_per_file = 10,
     train=
         dict(
             type=dataset_type,
