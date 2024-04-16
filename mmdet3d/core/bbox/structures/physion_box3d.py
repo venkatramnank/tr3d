@@ -9,7 +9,7 @@ from .base_box3d import BaseInstance3DBoxes
 from .utils import rotation_3d_in_axis
 from physion.external.rotation_continuity.utils import compute_rotation_matrix_from_ortho6d
 from physion.physion_tools import canonical_to_world
-from physion.physion_nms import iou_3d
+from physion.physion_nms import *
 
 class Physion3DBoxes(object):
     def __init__(self, tensor, box_dim = 12, with_ortho6d=True, origin=(0.5, 0.5, 0)):
@@ -396,9 +396,15 @@ class Physion3DBoxes(object):
         assert type(boxes1) == type(boxes2)
         boxes1_corners = boxes1.corners
         boxes2_corners = boxes2.corners
-        desired_order = torch.index_select([[6, 2, 1, 5, 7, 3, 0, 4]]).to(boxes1.device)
+        '''
+        tensor([1, 5, 4, 0, 3, 7, 6, 2])
+        tensor([1, 0, 2, 3, 5, 4, 6, 7])
+        tensor([3, 1, 0, 2, 7, 5, 4, 6])
+        '''
+        # import pdb; pdb.set_trace()
+        desired_order = torch.LongTensor([1, 5, 4, 0, 3, 7, 6, 2]).to(boxes1_corners.device)
         rearranged_boxes1_corners = torch.index_select(boxes1_corners, dim=1, index=desired_order)
         rearranged_boxes2_corners = torch.index_select(boxes2_corners, dim=1, index=desired_order)
-        _, iou = iou_3d(rearranged_boxes1_corners, rearranged_boxes2_corners, eps=1e-6)
+        _, iou = filtered_box3d_overlap(rearranged_boxes1_corners, rearranged_boxes2_corners, eps=1e-6)
         
         return iou

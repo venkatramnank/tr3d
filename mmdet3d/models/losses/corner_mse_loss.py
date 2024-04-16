@@ -19,9 +19,9 @@ class CornerBoundingBoxLoss(nn.Module):
         # Ensure both predicted and target corners have the same shape
         assert pred_corners.shape == target_corners.shape, \
             "Shape mismatch between predicted and target corners"
-        eps = 1e-6
+        eps = 1e-10
         criterion = nn.MSELoss(reduction='none')
-        loss_per_corner = torch.sqrt(criterion(pred_corners, target_corners) +  eps)
+        loss_per_corner = torch.sqrt(criterion(pred_corners, target_corners)+eps)
         loss = torch.mean(loss_per_corner, dim=(1, 2), keepdim=True)
         loss = (loss.squeeze(1)).squeeze(1)
         return loss

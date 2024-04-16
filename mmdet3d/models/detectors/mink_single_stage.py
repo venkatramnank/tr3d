@@ -65,7 +65,6 @@ class MinkSingleStage3DDetector(Base3DDetector):
             SparseTensor: Voxelized point clouds.
         """
        # voxelization with voxel size of 0.05 
-        
         points = [p[voxelize(p[:, :3], self.voxel_size)] for p in points]  # [65536 x 6] [] [] ... b #TODO: visualize it once
         # import pdb; pdb.set_trace()
         # visualizer = PointCloudVisualizer()
@@ -128,7 +127,8 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             list[dict]: Predicted 3d boxes.
         """
- 
+
+        
         x = self.extract_feats(points)
         bbox_list = self.head.forward_test(x, img_metas)
         bbox_results = [

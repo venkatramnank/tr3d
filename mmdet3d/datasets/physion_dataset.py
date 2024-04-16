@@ -69,7 +69,7 @@ class PhysionDataset(Custom3DDataset):
         assert 'use_camera' in self.modality and \
             'use_lidar' in self.modality
         assert self.modality['use_camera'] or self.modality['use_lidar']
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
     #TODO: modify this dataset in such a way at random only file name/information of data is taken
     #TODO: Write a custom dataloader that loads at random sample 100 hdf5s and random frames from them
     def get_data_info(self, index):
@@ -90,7 +90,7 @@ class PhysionDataset(Custom3DDataset):
                 - calib (dict, optional): Camera calibration info.
                 - ann_info (dict): Annotation info.
         """
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         info = self.data_infos[index]
         sample_idx = info['point_cloud']['lidar_idx']
         assert info['point_cloud']['lidar_idx'] == info['image']['image_idx']
@@ -269,7 +269,7 @@ class PhysionDataset(Custom3DDataset):
         Returns:
             dict: Evaluation results.
         """
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         # evaluate 3D detection performance
         if isinstance(results[0], dict):
             return super().evaluate(results, metric, iou_thr, logger, show,

@@ -16,7 +16,7 @@ class RandomFrameSampler(Sampler):
     
     def _sample_data(self):
         file_name_to_frame_numbers = defaultdict(list)
-        for i,data in enumerate(self.data_infos.data_infos):
+        for i,data in enumerate(self.data_infos.data_infos):           
             file_name = data[1]
             file_name_to_frame_numbers[file_name].append(i) #essentially storing the index
 
@@ -28,8 +28,10 @@ class RandomFrameSampler(Sampler):
             else:
                 sampled_data.extend(random.sample(data_list, self.num_frames_per_file))
         random.shuffle(sampled_data)
+
         return sampled_data
 
 
     def __iter__(self):
+        self.sampled_data = self._sample_data()
         return iter(self.sampled_data)

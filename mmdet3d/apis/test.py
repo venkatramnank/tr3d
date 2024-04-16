@@ -27,19 +27,15 @@ def get_phys_dict(file, img_idx, _file, frame_id):
         # RGB_IMG_PATH = os.path.join(STORE_PATH_ROOT, "phys_trainval_new", "image", SPLIT) + "/" + file_frame_combined_name + ".jpg"
         # # RGB_IMG_PATH = os.path.join(STORE_PATH_ROOT, "phys_trainval", "image") + "/" + file_frame_combined_name + ".jpg"
         # image.save(RGB_IMG_PATH)
-
         img_width = image.size[0]
         img_height = image.size[1]
         num_segments_in_img = len(s_obj["object_segmentation_colors"][:])
-
         pcd_info = {
             'num_features': 6,
             'lidar_idx': img_idx 
         }
-
         # pts_path = 'points_new/{}/'.format(SPLIT) + file_frame_combined_name + '.bin'
         # pts_path = 'points/' + file_frame_combined_name + '.bin'
-
         # TODO: Verify image_idx
         # image_obj = {
         #     'image_idx': img_idx,
@@ -47,25 +43,19 @@ def get_phys_dict(file, img_idx, _file, frame_id):
         #     # 'image' : np.array(image)
         #     # 'image_path': 'image/{}/'.format(SPLIT) + file_frame_combined_name + '.jpg'
         # }
-
         np_cam = np.reshape(np.asarray(f_obj[frame_id]['camera_matrices']['camera_matrix_cam0'][:]), (4,4))
         np_proj_mat = np.reshape(np.asarray(f_obj[frame_id]['camera_matrices']['projection_matrix_cam0'][:]), (4,4))
-        
         # TODO: Verify
         pix_T_cam, _, _ = get_intrinsics_from_projection_matrix(np_proj_mat, (img_height, img_width))
         # calib = {
         #     'K': pix_T_cam.astype(np.float32),
         #     'Rt': np_cam.astype(np.float32)
         # }
-
         pcd_generator = PhysionPointCloudGenerator(hdf5_file_path=os.path.join(_file), frame_number=frame_id, plot=False)
         pcd_points = pcd_generator.run()
-
         if pcd_points is None: return
         # pcd_points.astype('float32').tofile(os.path.join(STORE_PATH_ROOT, pts_path))
-        
         # pcd_new = open3d_convert_rgbd_to_pcd(pix_T_cam, np.array(image), pcd_generator.get_depth_values(f_obj[frame_id]["images"]["_depth_cam0"][:], width=512, height=512, near_plane=0.1, far_plane=100))
-        
         bbox_list = []
         location_list = []
         dimensions_list = []
@@ -74,9 +64,7 @@ def get_phys_dict(file, img_idx, _file, frame_id):
         # names_list = []
         # index_list = []
         # bbox_points_list = []
-
         for seg_id in range(num_segments_in_img):
-
             obj_name = s_obj['model_names'][:][seg_id]
             if obj_name in s_obj['distractors'][:]:
                 continue
@@ -84,19 +72,15 @@ def get_phys_dict(file, img_idx, _file, frame_id):
                 continue
             if obj_name not in CRUCIAL_OBJECTS:
                 continue
-
-
             seg_color = s_obj["object_segmentation_colors"][seg_id]
             # object_name = s_obj['model_names'][seg_id].decode('utf-8')
             # Adding to the set in order to see different types of objects
-        
             seg = f_obj[frame_id]["images"]["_id_cam0"][:]
             image = Image.open(io.BytesIO(seg))
             image = ImageOps.mirror(image)
             seg_numpy_arr = np.array(image)
             seg_mask = (seg_numpy_arr == seg_color).all(-1)
             seg_mask = seg_mask.astype(np.uint8)
-            
             if not np.any(seg_mask):
                 # NOTE: Some error in data for pilot_dominoes_0mid_d3chairs_o1plants_tdwroom_0001.hdf5, final seg mask empty
                 # warnings.warn('Missing segmentation mask for file: ' + _file + " at frame: " + frame_id) 
@@ -104,28 +88,21 @@ def get_phys_dict(file, img_idx, _file, frame_id):
             # import pdb; pdb.set_trace() 
             bbox = get_bbox_from_seg_mask(seg_mask)
             bbox_list.append(bbox)
-
             location_list.append(f_obj[frame_id]["objects"]["center_cam0"][seg_id])
             # center = f_obj[frame_id]["objects"]["center_cam0"][seg_id]
             # convert_camera_to_world(np_cam, np_proj_mat, center)
-            
             front = f_obj[frame_id]["objects"]["front_cam0"][seg_id]
             back = f_obj[frame_id]["objects"]["back_cam0"][seg_id]
             # width_val = abs(front[2] - back[2])
-
             left = f_obj[frame_id]["objects"]["left_cam0"][seg_id]
             right = f_obj[frame_id]["objects"]["right_cam0"][seg_id]
             # length_val = abs(left[0] - right[0])
-
             top = f_obj[frame_id]["objects"]["top_cam0"][seg_id]
             bottom = f_obj[frame_id]["objects"]["bottom_cam0"][seg_id]
             # height_val = abs(top[1] - bottom[1])
-
             center_x = f_obj[frame_id]["objects"]["center_cam0"][seg_id][0]
             center_y = f_obj[frame_id]["objects"]["center_cam0"][seg_id][1]
             center_z = f_obj[frame_id]["objects"]["center_cam0"][seg_id][2]
-            
-
             #TODO: Check quartonion order
             [x,y,z, w] = f_obj[frame_id]["objects"]["rotations_cam0"][seg_id]
             # t = f_obj[frame_id]["objects"]["positions_cam0"][seg_id]
@@ -135,19 +112,15 @@ def get_phys_dict(file, img_idx, _file, frame_id):
             # R_from_ortho = compute_rotation_matrix_from_ortho6d_np(ortho6d.reshape(1, 6)).squeeze(0)
             points = [front, back, left, right, top, bottom]
             points = np.array(points)
-
-            def calculate_bounding_box_dimensions(points):
-                
+            def calculate_bounding_box_dimensions(points): 
                 points = [np.array(point) for point in points]
                 length = np.linalg.norm(points[0] - points[1])
                 width = np.linalg.norm(points[2] - points[3])
                 height = np.linalg.norm(points[4] - points[5])
-
                 return [length, width, height]
             # import pdb; pdb.set_trace()
             bbox_3d_dims = calculate_bounding_box_dimensions(points)
-            dimensions_list.append([bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[2]])
-                
+            dimensions_list.append([bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[2]])    
             yaw = math.atan2(2.0*(y*z + x*y), w*w + x*x - y*y - z*z)
             heading_ang.append(yaw)
             # [x, y, z, w, h, l, 6d representation of R]
@@ -158,14 +131,11 @@ def get_phys_dict(file, img_idx, _file, frame_id):
             # gt_boxes_upright_depth = [t[0], t[1], t[2], bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
             # gt_boxes_upright_depth = [center, front, back, left, right, top, bottom]
             # bbox_points = [center, front, top, back, bottom, left, right]
-    
             if len(gt_boxes_upright_depth) == 0 : import pdb; pdb.set_trace()
             gt_boxes_upright_depth_list.append(gt_boxes_upright_depth)
             # bbox_points_list.append(bbox_points)
             # names_list.append(obj_name.decode('utf-8'))
             # index_list.append(CRUCIAL_OBJECTS_CLASS[obj_name])
-
-
         """ 
         center = [0, 0.5, 0]
         front = [0, 0.5, 0.5]
@@ -175,7 +145,6 @@ def get_phys_dict(file, img_idx, _file, frame_id):
         left = [-0.5, 0.5, 0]
         right = [0.5, 0.5, 0]
         """
-        
         # canonical_values = {"center":[0, 0.5, 0],
         #                     "front":[0, 0.5, 0.5],
         #                     "top":[0, 1, 0],
@@ -183,15 +152,11 @@ def get_phys_dict(file, img_idx, _file, frame_id):
         #                     "bottom":[0,0,0],
         #                     "left":[-0.5, 0.5, 0],
         #                     "right":[0.5, 0.5, 0]}
-        
-        
         # # import pdb; pdb.set_trace()
         # # gt_world_coords = convert_to_world_coords(gt_boxes_upright_depth_list)
         # # # gt_world_coords = bbox_to_corners(torch.tensor(gt_boxes_upright_depth_list))
         # # visualizer = PointCloudVisualizer()
         # visualizer.visualize_point_cloud_and_bboxes(pcd_points, gt_world_coords, use_points=True, show=True)
-
-        
         num_segments_in_img = len(gt_boxes_upright_depth_list)
         annos = {
             'gt_num': num_segments_in_img,
@@ -206,7 +171,6 @@ def get_phys_dict(file, img_idx, _file, frame_id):
             # 'class': np.asarray(index_list),
             'gt_boxes_upright_depth': np.asarray(gt_boxes_upright_depth_list)
         }
-
         assert len(gt_boxes_upright_depth_list) == annos['gt_num']
         return {
             'point_cloud': pcd_info,
@@ -273,6 +237,7 @@ def single_gpu_test(model,
         if data_infos is None and len(data) == 0: continue
         gt_data = data_infos['annos']['gt_boxes_upright_depth']
         data['filename'] = data_infos['filename']
+        # data['points'][0]._data[0][0] = torch.tensor(data_infos['points'], dtype= torch.float32) #TODO: Note that there is a change in terms of points in data_infos and data
         filenames.append(data['filename'])
         if len(gt_data) == 0:
             import pdb; pdb.set_trace()
@@ -325,8 +290,12 @@ def single_gpu_test(model,
                         score_thr=show_score_thr)
         results.extend(result)
         indices_to_consider.append(i)
-
+        #TODO: Remove later
+        # if i == 2000:
+        #     import pdb; pdb.set_trace()
+            # return results, filenames, indices_to_consider
         batch_size = len(result)
         for _ in range(batch_size):
             prog_bar.update()
+    
     return results, filenames, indices_to_consider

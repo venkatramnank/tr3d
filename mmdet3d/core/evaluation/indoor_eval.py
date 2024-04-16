@@ -68,7 +68,7 @@ def eval_det_cls(pred, gt, iou_thr=None):
     """
 
     # {img_id: {'bbox': box structure, 'det': matched list}}
-
+    
     class_recs = {}
     npos = 0
     for img_id in gt.keys():
@@ -83,7 +83,7 @@ def eval_det_cls(pred, gt, iou_thr=None):
         det = [[False] * len(bbox) for i in iou_thr]
         npos += len(bbox)
         class_recs[img_id] = {'bbox': bbox, 'det': det}
-
+  
     # construct dets
     image_ids = []
     confidence = []
@@ -103,6 +103,8 @@ def eval_det_cls(pred, gt, iou_thr=None):
         gt_cur = class_recs[img_id]['bbox']
         if len(gt_cur) > 0:
             # calculate iou in each image
+            #TODO: Something is fishy here
+            # import pdb; pdb.set_trace()
             iou_cur = pred_cur.overlaps(pred_cur, gt_cur)
             for i in range(cur_num):
                 ious.append(iou_cur[i])
@@ -115,7 +117,7 @@ def eval_det_cls(pred, gt, iou_thr=None):
     sorted_ind = np.argsort(-confidence)
     image_ids = [image_ids[x] for x in sorted_ind]
     ious = [ious[x] for x in sorted_ind]
-
+  
     # go down dets and mark TPs and FPs
     nd = len(image_ids)
     tp_thr = [np.zeros(nd) for i in iou_thr]
@@ -177,6 +179,7 @@ def eval_map_recall(pred, gt, ovthresh=None):
     ret_values = {}
     for classname in gt.keys():
         if classname in pred:
+            
             ret_values[classname] = eval_det_cls(pred[classname],
                                                  gt[classname], ovthresh)
     recall = [{} for i in ovthresh]
@@ -340,7 +343,8 @@ def indoor_eval_physion(gt_annos,
     Return:
         dict[str, float]: Dict of results.
     """
-
+    #TODO: implement batch processing
+    # import pdb; pdb.set_trace()
     assert len(dt_annos) == len(gt_annos)
     pred = {}  # map {class_id: pred}
     gt = {}  # map {class_id: gt}

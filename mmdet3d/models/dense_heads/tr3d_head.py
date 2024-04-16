@@ -6,6 +6,7 @@ except ImportError:
         'Please follow `getting_started.md` to install MinkowskiEngine.`')
 
 import torch
+import mmdet3d.models.losses as losses
 from mmcv.cnn import bias_init_with_prob
 from mmcv.ops import nms3d, nms3d_normal
 from mmcv.runner import BaseModule
@@ -108,7 +109,9 @@ class TR3DHead(BaseModule):
             return torch.empty([0, 8, 3], device=bbox.device)
         center = bbox[:, :3]
         if pos_points is not None:
-            center += pos_points
+            new_center = center + pos_points
+        else:
+            new_center = center.clone()
         dims = bbox[:, 3:6]
         corners_norm = torch.stack([
             torch.Tensor([0.5, 0.5, 0.5]),
@@ -125,19 +128,20 @@ class TR3DHead(BaseModule):
         rotation_matrix = compute_rotation_matrix_from_ortho6d(bbox[:, 6:])
         corners = rotation_matrix@corners.transpose(1,2)
         corners = corners.permute(0,2,1) 
-        corners += center.view(-1, 1, 3)
-        corners_center = torch.concat([corners, center.unsqueeze(1)], dim=1)
-        """
+        corners += new_center.view(-1, 1, 3)
+        corners_center = torch.concat([corners, new_center.unsqueeze(1)], dim=1)
+ 
         #NOTE: Enable gradient tracking
-        corners.requires_grad_(True)
+        # corners.requires_grad_(True)
 
-        def hook_fn(grad):
-            print('Gradients passing through bbox_to_corners:', grad)
+        # def hook_fn(grad):
+        #     print('Gradients passing through bbox_to_corners:', grad)
 
-        # Register the hook to the tensor
-        corners.register_hook(hook_fn)
-        """
+        # # Register the hook to the tensor
+        # corners.register_hook(hook_fn)
+        
         return corners_center
+ 
     
     @staticmethod
     def _bbox_to_loss(bbox):
@@ -210,7 +214,7 @@ class TR3DHead(BaseModule):
         bbox_preds = torch.cat(bbox_preds)
         cls_preds = torch.cat(cls_preds)
         points = torch.cat(points)
-        
+
         # cls loss
         n_classes = cls_preds.shape[1]
         pos_mask = assigned_ids >= 0
@@ -222,6 +226,7 @@ class TR3DHead(BaseModule):
         cls_loss = self.cls_loss(cls_preds, cls_targets)
         
         # bbox loss
+        #TODO: Need to unit test the loss
         pos_bbox_preds = bbox_preds[pos_mask]
         if pos_mask.sum() > 0:
             pos_points = points[pos_mask]
@@ -237,15 +242,29 @@ class TR3DHead(BaseModule):
             #         self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
             #     self._bbox_to_loss(pos_bbox_targets)) 
             # print(points)
-            
-            bbox_loss = self.bbox_loss(
-            self.bbox_to_corners(pos_bbox_preds, pos_points),
-            self.bbox_to_corners(pos_bbox_targets) 
-            )            
-          
+
+            if type(self.bbox_loss).__name__ == 'ChamferDistance':
+                 # in terms of chamfer distance you get two losses: from source and target. So we add them up!!    
+                src_loss, dst_loss = self.bbox_loss(
+                                    self.bbox_to_corners(pos_bbox_preds, pos_points),
+                                    self.bbox_to_corners(pos_bbox_targets),
+                                    # self.bbox_to_corners(pos_bbox_targets) 
+                                    )
+
+                bbox_loss = (src_loss + dst_loss).reshape(1)
+                         
+            else:
+
+                bbox_loss = self.bbox_loss(
+                self.bbox_to_corners(pos_bbox_preds, pos_points),
+                self.bbox_to_corners(pos_bbox_targets)
+                # self.bbox_to_corners(pos_bbox_targets) 
+                )  
+                    
+
         else:
             bbox_loss = None
-        
+        # print('bbox_loss: ', bbox_loss)
         return bbox_loss, cls_loss, pos_mask
 
     def _loss(self, bbox_preds, cls_preds, points,
@@ -269,8 +288,11 @@ class TR3DHead(BaseModule):
 
     def forward_train(self, x, gt_bboxes, gt_labels, img_metas):
         bbox_preds, cls_preds, points = self(x)
-        return self._loss(bbox_preds, cls_preds, points,
+        
+        losses =  self._loss(bbox_preds, cls_preds, points,
                           gt_bboxes, gt_labels, img_metas)
+
+        return losses
 
     def _nms(self, bboxes, scores, img_meta):
         """Multi-class nms for a single scene.
@@ -284,6 +306,7 @@ class TR3DHead(BaseModule):
             Tensor: Predicted scores.
             Tensor: Predicted labels.
         """
+
         n_classes = scores.shape[1]
         yaw_flag = bboxes.shape[1] == 7
         nms_bboxes, nms_scores, nms_labels = [], [], []
@@ -408,12 +431,12 @@ class TR3DHead(BaseModule):
         assert boxes_corners.size(1) == 8, 'Input boxes corners shape should be (N, 8, 3)'
         order = scores.sort(0, descending=True)[1]
         boxes_corners = boxes_corners[order].contiguous()
-        desired_order = torch.LongTensor([6, 2, 1, 5, 7, 3, 0, 4]).to(boxes_corners.device)
+        desired_order = torch.LongTensor([3, 1, 0, 2, 7, 5, 4, 6]).to(boxes_corners.device)
         rearranged_boxes_corners = torch.index_select(boxes_corners, dim=1, index=desired_order)
         try:
             # intersection_vol, iou_3d_vals = iou_3d(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)
             _, iou_3d_vals = filtered_box3d_overlap(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)
-        except ValueError:
+        except ValueError or RuntimeError or TypeError:
             import pdb; pdb.set_trace()
         keep = torch.ones(scores.size(0), dtype=torch.bool, device=boxes_corners.device)
         keep &= filter_boxes(rearranged_boxes_corners,eps=1e-6).to(boxes_corners.device)

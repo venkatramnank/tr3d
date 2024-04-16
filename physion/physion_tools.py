@@ -523,9 +523,6 @@ class PointCloudVisualizer:
             self.vis.destroy_window()
 
 
-#TODO: need to write properties for canonical space to world coordinates and vice versa in terms of utils
-#TODO: Need to store the canonical values correctly and since it is same across, it can be passed to the corners calculation correctly (directly)
-
 
 def canonical_to_world_np(points, R, trans, scale):
     return R @ (np.diag(scale) @ points) + trans

@@ -151,6 +151,39 @@ class PhysionRandomFrameDataset(Dataset):
         random.shuffle(sampled_data)
 
         return sampled_data
+    
+    def _calculate_bounding_box_extents(self, bbox_corners):
+        #NOTE: be wary of the axis
+        min_coords = []
+        max_coords = []
+        for obj_bbox in bbox_corners:
+            min_coords_obj = torch.min(obj_bbox, axis=0)
+            max_coords_obj = torch.max(obj_bbox, axis=0)
+            min_coords.append(min_coords_obj)
+            max_coords.append(max_coords_obj)
+        return min_coords, max_coords
+    
+    def _filter_density_and_boxes(self, gt_boxes, densities, threshold):
+        filtered_gt_boxes = []
+        filtered_densities = []
+
+        for bbox, density in zip(gt_boxes, densities):
+            if density >= threshold:
+                filtered_gt_boxes.append(bbox)
+                filtered_densities.append(density)
+
+        return filtered_gt_boxes, filtered_densities
+    
+    def density_within_boxes(self, pcd, bbox_corners):
+        min_coords, max_coords = self._calculate_bounding_box_extents(bbox_corners)
+        density_points_per_obj = []
+        for min_coord_per_obj, max_coord_per_obj in zip(min_coords, max_coords):
+            points_within_bbox = pcd[(pcd[:, 0] >= min_coord_per_obj.values[0].numpy()) & (pcd[:, 0] <= max_coord_per_obj.values[0].numpy()) &
+                                    (pcd[:, 1] >= min_coord_per_obj.values[1].numpy()) & (pcd[:, 1] <= max_coord_per_obj.values[1].numpy()) &
+                                    (pcd[:, 2] >= min_coord_per_obj.values[2].numpy()) & (pcd[:, 2] <= max_coord_per_obj.values[2].numpy())]
+            density = len(points_within_bbox)
+            density_points_per_obj.append(density)
+        return density_points_per_obj
 
     def get_phys_dict(self, file, img_idx, _file, frame_id):
         # file_frame_combined_name = _file.split(".hdf5")[0] + "_" + str(_file_idx) + "_" + frame_id
@@ -187,7 +220,7 @@ class PhysionRandomFrameDataset(Dataset):
         np_cam = np.reshape(np.asarray(f_obj[frame_id]['camera_matrices']['camera_matrix_cam0'][:]), (4,4))
         np_proj_mat = np.reshape(np.asarray(f_obj[frame_id]['camera_matrices']['projection_matrix_cam0'][:]), (4,4))
         
-        # TODO: Verify
+        # TODO: How to remove the labels(bboxes) which have very small amount of points in them?
         pix_T_cam, _, _ = get_intrinsics_from_projection_matrix(np_proj_mat, (img_height, img_width))
         # calib = {
         #     'K': pix_T_cam.astype(np.float32),
@@ -196,7 +229,6 @@ class PhysionRandomFrameDataset(Dataset):
 
         pcd_generator = PhysionPointCloudGenerator(hdf5_file_path=os.path.join(_file), frame_number=frame_id, plot=False)
         pcd_points = pcd_generator.run()
-
         if pcd_points is None: return
         # pcd_points.astype('float32').tofile(os.path.join(STORE_PATH_ROOT, pts_path))
         
@@ -236,7 +268,7 @@ class PhysionRandomFrameDataset(Dataset):
                 # NOTE: Some error in data for pilot_dominoes_0mid_d3chairs_o1plants_tdwroom_0001.hdf5, final seg mask empty
                 # warnings.warn('Missing segmentation mask for file: ' + _file + " at frame: " + frame_id) 
                 continue
-            # import pdb; pdb.set_trace() 
+
             bbox = get_bbox_from_seg_mask(seg_mask)
             bbox_list.append(bbox)
 
@@ -323,13 +355,20 @@ class PhysionRandomFrameDataset(Dataset):
         #                     "right":[0.5, 0.5, 0]}
         
         
-        # # import pdb; pdb.set_trace()
+
         # # gt_world_coords = convert_to_world_coords(gt_boxes_upright_depth_list)
         # # # gt_world_coords = bbox_to_corners(torch.tensor(gt_boxes_upright_depth_list))
         # # visualizer = PointCloudVisualizer()
         # visualizer.visualize_point_cloud_and_bboxes(pcd_points, gt_world_coords, use_points=True, show=True)
-
-        
+        '''
+        bbox_corners = bbox_to_corners(torch.tensor(gt_boxes_upright_depth_list))
+        density_list = self.density_within_boxes(pcd_points, bbox_corners)
+        #TODO: Need to test on filter threshold
+        gt_boxes_upright_depth_list, density_list = self._filter_density_and_boxes(gt_boxes_upright_depth_list, density_list, threshold=1000)
+        '''
+        # visualizer = PointCloudVisualizer()
+        # filtered_bbox_corners = bbox_to_corners(torch.tensor(gt_boxes_upright_depth_list))
+        # visualizer.visualize_point_cloud_and_bboxes(pcd_points, filtered_bbox_corners, use_points=True, show=True)
         num_segments_in_img = len(gt_boxes_upright_depth_list)
         annos = {
             'gt_num': num_segments_in_img,
@@ -407,6 +446,7 @@ class PhysionRandomFrameDataset(Dataset):
             return None
         return input_dict
     
+
     
     def indoor_eval_physion(self,gt_annos,
                     dt_annos,
@@ -436,7 +476,7 @@ class PhysionRandomFrameDataset(Dataset):
         Return:
             dict[str, float]: Dict of results.
         """
-
+ 
         assert len(dt_annos) == len(gt_annos)
         pred = {}  # map {class_id: pred}
         gt = {}  # map {class_id: gt}
@@ -447,9 +487,18 @@ class PhysionRandomFrameDataset(Dataset):
                 gt_anno = self.get_gt_data_info(gt_anno)['ann_info']
             else:
                 continue
+
             if gt_anno is None:
                 # import pdb; pdb.set_trace()
                 continue
+
+            # NOTE: TESTING ONLY!!!! REMOVE WHEN NOT TESTING!!!
+            
+            # det_anno['labels_3d'] = torch.tensor(gt_anno['gt_labels_3d'])
+            # det_anno['boxes_3d'] = gt_anno['gt_bboxes_3d']
+            # det_anno['scores_3d'] = torch.ones(len(gt_anno['gt_labels_3d']))
+            
+         
             for i in range(len(det_anno['labels_3d'])):
                 label = det_anno['labels_3d'].numpy()[i]
                 bbox = det_anno['boxes_3d'].convert_to(box_mode_3d)[i]
@@ -490,7 +539,7 @@ class PhysionRandomFrameDataset(Dataset):
                 if img_id not in gt[label]:
                     gt[label][img_id] = []
                 gt[label][img_id].append(bbox)
-
+        # import pdb; pdb.set_trace()
         rec, prec, ap = eval_map_recall(pred, gt, metric)
         ret_dict = dict()
         header = ['classes']
@@ -815,6 +864,7 @@ class PhysionRandomFrameDataset(Dataset):
         #     logger=logger,
         #     box_type_3d=self.box_type_3d,
         #     box_mode_3d=self.box_mode_3d)
+        # import pdb; pdb.set_trace()
         ret_dict = self.indoor_eval_physion(
             gt_annos,
             results,
@@ -864,6 +914,7 @@ class PhysionRandomFrameDataset(Dataset):
             np.ndarray | torch.Tensor | list[np.ndarray | torch.Tensor]:
                 A single or a list of loaded data.
         """
+        
         assert pipeline is not None, 'data loading pipeline is not provided'
         # when we want to load ground-truth via pipeline (e.g. bbox, seg mask)
         # we need to set self.test_mode as False so that we have 'annos'

@@ -202,6 +202,7 @@ def filter_boxes(boxes,eps):
 
 def filtered_box3d_overlap(boxes1, boxes2, eps=1e-4):
     # Filter boxes1 and boxes2
+
     mask1 = filter_boxes(boxes1,eps=eps)
     mask2 = filter_boxes(boxes2,eps=eps)
     filtered_boxes1 = boxes1[mask1]
@@ -222,3 +223,4 @@ def filtered_box3d_overlap(boxes1, boxes2, eps=1e-4):
     iou_output[original_indices1[:, None], original_indices2[None, :]] = iou
 
     return vol_output, iou_output
+

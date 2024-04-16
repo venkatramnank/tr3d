@@ -145,3 +145,5 @@ class ChamferDistance(nn.Module):
             return loss_source, loss_target, indices1, indices2
         else:
             return loss_source, loss_target
+        
+
