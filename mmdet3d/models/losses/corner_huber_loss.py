@@ -3,9 +3,9 @@ from torch import nn as nn
 from ..builder import LOSSES
 
 @LOSSES.register_module()
-class CornerBoundingBoxLoss(nn.Module):
+class CornerBoundingBoxHuberLoss(nn.Module):
     def __init__(self):
-        super(CornerBoundingBoxLoss,self).__init__()
+        super(CornerBoundingBoxHuberLoss,self).__init__()
 
     def forward(self, pred_corners, target_corners):
         """
@@ -20,7 +20,7 @@ class CornerBoundingBoxLoss(nn.Module):
         assert pred_corners.shape == target_corners.shape, \
             "Shape mismatch between predicted and target corners"
         eps = 1e-6
-        criterion = nn.MSELoss(reduction='none')
+        criterion = nn.HuberLoss(reduction='none')
         # loss_per_corner = torch.sqrt(criterion(pred_corners, target_corners)+eps)
         loss = criterion(pred_corners, target_corners)
         # loss = torch.mean(loss_per_corner, dim=(1, 2), keepdim=True)
