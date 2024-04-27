@@ -226,7 +226,7 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
-        outputs, filenames = single_gpu_test(model, data_loader, args.show, args.show_dir)
+        outputs, filenames, indices_to_consider = single_gpu_test(model, data_loader, args.show, args.show_dir)
         print('FILE NAMES OUTPUT FOR TEST (only first 10): ',filenames[:10])
     else:
         model = MMDistributedDataParallel(
@@ -253,7 +253,7 @@ def main():
             ]:
                 eval_kwargs.pop(key, None)
             eval_kwargs.update(dict(metric=args.eval, **kwargs))
-            print(dataset.evaluate(outputs, show=args.show, out_dir=args.show_dir, **eval_kwargs))
+            print(dataset.evaluate(outputs, indices_to_consider, show=args.show, out_dir=args.show_dir, **eval_kwargs))
 
 
 if __name__ == '__main__':

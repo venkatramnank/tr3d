@@ -2,7 +2,7 @@
 import numpy as np
 from mmcv.parallel import DataContainer as DC
 
-from mmdet3d.core.bbox import BaseInstance3DBoxes, Physion3DBoxes
+from mmdet3d.core.bbox import BaseInstance3DBoxes, Physion3DBoxes, Physion3DCenter
 from mmdet3d.core.points import BasePoints
 from mmdet.datasets.pipelines import to_tensor
 from ..builder import PIPELINES
@@ -65,6 +65,9 @@ class DefaultFormatBundle(object):
                 results['gt_bboxes_3d'] = DC(
                     results['gt_bboxes_3d'], cpu_only=True)
             elif isinstance(results['gt_bboxes_3d'], Physion3DBoxes):
+                results['gt_bboxes_3d'] = DC(
+                    results['gt_bboxes_3d'], cpu_only=True)
+            elif isinstance(results['gt_bboxes_3d'], Physion3DCenter):
                 results['gt_bboxes_3d'] = DC(
                     results['gt_bboxes_3d'], cpu_only=True)
             else:
@@ -207,6 +210,7 @@ class DefaultFormatBundle3D(DefaultFormatBundle):
                 default bundle.
         """
         # Format 3D data
+        
         if 'points' in results:
             assert isinstance(results['points'], BasePoints)
             results['points'] = DC(results['points'].tensor)

@@ -309,7 +309,7 @@ def train_detector(model,
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
         runner.register_hook(
-            eval_hook(val_dataloader, interval=12, **eval_cfg), priority='LOW')
+            eval_hook(val_dataloader, interval=5, **eval_cfg), priority='LOW')
 
     resume_from = None
     if cfg.resume_from is None and cfg.get('auto_resume'):

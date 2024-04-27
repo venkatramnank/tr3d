@@ -154,7 +154,7 @@ def get_box_type(box_type):
         tuple: Box type and box mode.
     """
     from .box_3d_mode import (Box3DMode, CameraInstance3DBoxes,
-                              DepthInstance3DBoxes, LiDARInstance3DBoxes, Physion3DBoxes)
+                              DepthInstance3DBoxes, LiDARInstance3DBoxes, Physion3DBoxes, Physion3DCenter)
     box_type_lower = box_type.lower()
     if box_type_lower == 'lidar':
         box_type_3d = LiDARInstance3DBoxes
@@ -168,8 +168,11 @@ def get_box_type(box_type):
     elif box_type_lower == 'physion':
         box_type_3d = Physion3DBoxes
         box_mode_3d = Box3DMode.PHYSION
+    elif box_type_lower == 'physioncenter':
+        box_type_3d = Physion3DCenter
+        box_mode_3d = Box3DMode.PHYSIONCENTER
     else:
-        raise ValueError('Only "box_type" of "camera", "lidar", "depth", "physion"'
+        raise ValueError('Only "box_type" of "camera", "lidar", "depth", "physion", "physioncenter"'
                          f' are supported, got {box_type}')
 
     return box_type_3d, box_mode_3d

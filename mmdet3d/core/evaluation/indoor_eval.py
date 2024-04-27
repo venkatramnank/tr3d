@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from mmcv.utils import print_log
 from terminaltables import AsciiTable
+from scipy.optimize import linear_sum_assignment
 
 def average_precision(recalls, precisions, mode='area'):
     """Calculate average precision (for single or multiple scales).
@@ -159,6 +160,83 @@ def eval_det_cls(pred, gt, iou_thr=None):
 
     return ret
 
+def match_coordinates(pred_centers, gt_centers, threshold=5.0):
+    """
+    Match predicted coordinates to ground truth coordinates based on  Hungarian matching.
+
+    Args:
+    pred_centers (torch.Tensor): Predicted centers of objects (N_pred x 2).
+    gt_centers (torch.Tensor): Ground truth centers of objects (N_gt x 2).
+    threshold (float): Threshold for matching (default: 5.0).
+
+    Returns:
+    list of tuple: List of matched indices (pred_idx, gt_idx).
+    """
+    # Convert tensors to numpy arrays
+    pred_centers_np = pred_centers.cpu().numpy()
+    gt_centers_np = gt_centers.cpu().numpy()
+
+    # Compute pairwise Euclidean distances between predicted and ground truth centers
+    distances = np.linalg.norm(pred_centers_np[:, np.newaxis, :] - gt_centers_np[np.newaxis, :, :], axis=-1)
+
+    # Apply threshold to distances
+    distances[distances > threshold] = np.inf
+    # Perform Hungarian matching
+    pred_idx, gt_idx = linear_sum_assignment(distances)
+
+    # Filter matches based on threshold
+    valid_matches = (distances[pred_idx, gt_idx] <= threshold)
+
+    # Convert matched indices to list of tuples
+    matches = [(pred_idx[i], gt_idx[i]) for i in range(len(pred_idx)) if valid_matches[i]]
+
+    return matches
+
+def eval_det_cls_center(pred, gt):
+    """Generic functions to compute distance for two points
+    """
+    #TODO: Change this to get good results
+    # {img_id: {'bbox': box structure, 'det': matched list}}
+    
+    class_recs = {}
+    for img_id in gt.keys():
+        cur_gt_num = len(gt[img_id])
+        if cur_gt_num != 0:
+            gt_cur = torch.zeros([cur_gt_num, 3], dtype=torch.float32) 
+            for i in range(cur_gt_num):
+                gt_cur[i] = gt[img_id][i].tensor
+            bbox = gt[img_id][0].new_box(gt_cur)
+        else:
+            bbox = gt[img_id]
+        class_recs[img_id] = {'bbox': bbox}
+    mses = []
+    for img_id in pred.keys():
+        gt_current_img = torch.cat([obj.tensor for obj in gt[img_id]])
+        pred_current_img = torch.cat([obj[0].tensor for obj in pred[img_id]])
+        matches = match_coordinates(pred_current_img, gt_current_img)
+        squared_errors = []
+
+        # Calculate squared errors for matched centers
+        for pred_idx, gt_idx in matches:
+            pred_coord = pred_current_img[pred_idx]
+            gt_coord = gt_current_img[gt_idx]
+            error = torch.sum((pred_coord - gt_coord) ** 2)
+            squared_errors.append(error.item())  # Convert tensor to Python scalar
+
+        # Compute mean squared error
+        mse = torch.tensor(squared_errors).mean().item()
+        mses.append(mse)
+
+    mean_mses = sum(mses)/len(mses)
+    return mean_mses
+
+def eval_center(pred, gt):
+    ret_values = {}
+    for classname in gt.keys():
+        ret_values[classname] = eval_det_cls_center(pred[classname],
+                                                 gt[classname])
+        
+    return ret_values       
 
 def eval_map_recall(pred, gt, ovthresh=None):
     """Evaluate mAP and recall.
@@ -179,7 +257,7 @@ def eval_map_recall(pred, gt, ovthresh=None):
     ret_values = {}
     for classname in gt.keys():
         if classname in pred:
-            
+            import pdb; pdb.set_trace()
             ret_values[classname] = eval_det_cls(pred[classname],
                                                  gt[classname], ovthresh)
     recall = [{} for i in ovthresh]

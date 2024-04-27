@@ -9,6 +9,7 @@ from .cam_box3d import CameraInstance3DBoxes
 from .depth_box3d import DepthInstance3DBoxes
 from .lidar_box3d import LiDARInstance3DBoxes
 from .physion_box3d import Physion3DBoxes
+from .physion_center3d import Physion3DCenter
 from .utils import limit_period
 
 
@@ -78,6 +79,7 @@ class Box3DMode(IntEnum):
     CAM = 1
     DEPTH = 2
     PHYSION = 3
+    PHYSIONCENTER = 4 
 
     @staticmethod
     def convert(box, src, dst, rt_mat=None, with_yaw=True):
@@ -109,7 +111,9 @@ class Box3DMode(IntEnum):
         is_numpy = isinstance(box, np.ndarray)
         is_Instance3DBoxes = isinstance(box, BaseInstance3DBoxes)
         is_Physion3DBoxes = isinstance(box, Physion3DBoxes)
+        is_Physion3DCenter = isinstance(box, Physion3DCenter)
         single_box = isinstance(box, (list, tuple))
+        with_quaternion = False
         if single_box:
             assert len(box) >= 7, (
                 'Box3DMode.convert takes either a k-tuple/list or '
@@ -122,6 +126,8 @@ class Box3DMode(IntEnum):
             elif is_Instance3DBoxes:
                 arr = box.tensor.clone()
             elif is_Physion3DBoxes:
+                arr = box.tensor.clone()
+            elif is_Physion3DCenter:
                 arr = box.tensor.clone()
             else:
                 arr = box.clone()
@@ -220,5 +226,9 @@ class Box3DMode(IntEnum):
             if dst == Box3DMode.PHYSION:
                 target_type = Physion3DBoxes
             return target_type(arr, box_dim=arr.size(-1), with_quaternion=with_quaternion)
+        elif is_Physion3DCenter:
+            if dst == Box3DMode.PHYSIONCENTER:
+                target_type = Physion3DCenter
+            return target_type(arr, box_dim=arr.size(-1))
         else:
             return arr

@@ -1,4 +1,4 @@
-voxel_size = .03 #NOTE: Increased voxel size
+voxel_size = .01 #NOTE: Increased voxel size
 n_points = 262144
 
 model = dict(
@@ -12,7 +12,7 @@ model = dict(
     head=dict(
         type='TR3DHead',
         in_channels=128,
-        n_reg_outs=12,
+        n_reg_outs=3,
         n_classes=1,
         voxel_size=voxel_size,
         assigner=dict(
@@ -23,16 +23,16 @@ model = dict(
     train_cfg=dict(),
     test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.3))
 
-optimizer = dict(type='AdamW', lr=.01, weight_decay=.0001)
-# optimizer = dict(type='SGD', lr=.001, weight_decay=.0001)
+optimizer = dict(type='AdamW', lr=1, weight_decay=.0001)
+# optimizer = dict(type='SGD', lr=.01, weight_decay=.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=10, norm_type=2))
 lr_config = dict(policy='step', warmup=None, step=[8, 11])
-runner = dict(type='EpochBasedRunner', max_epochs=5)
+runner = dict(type='EpochBasedRunner', max_epochs=100)
 custom_hooks = [dict(type='EmptyCacheHook', after_iter=True)]
 
-checkpoint_config = dict(interval=1, max_keep_ckpts=1)
+checkpoint_config = dict(interval=3, max_keep_ckpts=1)
 log_config = dict(
-    interval=50,
+    interval=1,
     hooks=[
         dict(type='TextLoggerHook'),
         dict(type='TensorboardLoggerHook')
@@ -44,55 +44,22 @@ load_from = None
 resume_from = None
 workflow = [('train', 1)]
 
-dataset_type = 'PhysionRandomFrameDataset'
-# data_root = '/media/kalyanav/Venkat/dominoes/'
+dataset_type = 'PhysionRandomFramePointsDataset'
 data_root = '/media/kalyanav/Venkat/support_data/'
-# class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
 train_pipeline = [
-    # dict(
-    #     type='LoadPointsFromFile',
-    #     coord_type='DEPTH',
-    #     shift_height=False,
-    #     use_color=True,
-    #     load_dim=6,
-    #     use_dim=[0, 1, 2, 3, 4, 5]),
     dict(type='LoadAnnotations3D'),
-    # dict(type='PointSample', num_points=n_points),
-    # dict(
-    #     type='RandomFlip3DPhysion'
-    # ),
-    # dict(
-    #     type='RandomFlip3D',
-    #     sync_2d=False,
-    #     flip_ratio_bev_horizontal=.5,
-    #     flip_ratio_bev_vertical=.0),
-    # dict(
-    #     type='GlobalRotScaleTrans',
-    #     rot_range=[-.523599, .523599],
-    #     scale_ratio_range=[.85, 1.15],
-    #     translation_std=[.1, .1, .1],
-    #     shift_height=False),
-    # dict(type='NormalizePointsColor', color_mean=None),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [
-    # dict(
-    #     type='LoadPointsFromFile',
-    #     coord_type='DEPTH',
-    #     shift_height=False,
-    #     use_color=True,
-    #     load_dim=6,
-    #     use_dim=[0, 1, 2, 3, 4, 5]),
+
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(512, 512),
         pts_scale_ratio=1,
         flip=False,
         transforms=[
-            # dict(type='PointSample', num_points=n_points),
-            # dict(type='NormalizePointsColor', color_mean=None),
             dict(
                 type='DefaultFormatBundle3D',
                 class_names=class_names,
@@ -104,35 +71,32 @@ data = dict(
     samples_per_gpu=16,
     workers_per_gpu=4,
     persistent_workers=False,
-    num_frames_per_file = 10,
+    num_frames_per_file = 1,
     train=
         dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
-            # ann_file=data_root+'train_dominoes_data.pkl',
-            ann_file=data_root+'train_onthefly_data.pkl',
+            ann_file=data_root+'train_onthefly_overfit_single.pkl',
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
-            box_type_3d='Physion'),
+            box_type_3d='Physioncenter'),
     val=dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        # ann_file=data_root + 'val_dominoes_data.pkl',
-        ann_file=data_root+'val_onthefly_data.pkl',
+        ann_file=data_root + 'train_onthefly_overfit_single.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
-        box_type_3d='Physion'),
+        box_type_3d='Physioncenter'),
     test=dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        # ann_file=data_root + 'val_dominoes_data.pkl',
-        ann_file=data_root+'val_onthefly_data.pkl',
+        ann_file=data_root + 'train_onthefly_overfit_single.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
-        box_type_3d='Physion'))
+        box_type_3d='Physioncenter'))

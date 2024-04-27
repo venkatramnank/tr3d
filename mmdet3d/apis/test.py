@@ -125,9 +125,9 @@ def get_phys_dict(file, img_idx, _file, frame_id):
             heading_ang.append(yaw)
             # [x, y, z, w, h, l, 6d representation of R]
             #TODO: need to change to scale and rotation
-            # gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
+            gt_boxes_upright_depth = [center_x , center_y, center_z, bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
             #  SCALE : [w,h,l] / [x,z,y]
-            gt_boxes_upright_depth = [center_x, center_y, center_z, bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
+            # gt_boxes_upright_depth = [center_x, center_y, center_z]
             # gt_boxes_upright_depth = [t[0], t[1], t[2], bbox_3d_dims[1], bbox_3d_dims[2], bbox_3d_dims[0]] + ortho6d.tolist()
             # gt_boxes_upright_depth = [center, front, back, left, right, top, bottom]
             # bbox_points = [center, front, top, back, bottom, left, right]
@@ -237,13 +237,47 @@ def single_gpu_test(model,
         if data_infos is None and len(data) == 0: continue
         gt_data = data_infos['annos']['gt_boxes_upright_depth']
         data['filename'] = data_infos['filename']
-        # data['points'][0]._data[0][0] = torch.tensor(data_infos['points'], dtype= torch.float32) #TODO: Note that there is a change in terms of points in data_infos and data
         filenames.append(data['filename'])
         if len(gt_data) == 0:
             import pdb; pdb.set_trace()
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, **data)
+            
+        '''
+        import pickle
+        with open('/home/kalyanav/MS_thesis/mmdetection3d/debugging/train_values_huber_1_epoch/data_pts_support.pkl', 'rb') as f:
+            data = pickle.load(f)
+        result = model(return_loss=False, rescale=True, **data)
+        import pdb; pdb.set_trace()
+        '''
+        '''
+        filtered_indices =(result[0]['scores_3d'] > 0.0)
+        filtered_boxes =  result[0]['boxes_3d'].tensor[filtered_indices.squeeze(1)].cpu().numpy()
+        
+        # visualizing the center predicitions
+        import open3d as o3d
+        pcd_set1 = o3d.geometry.PointCloud()
+        pcd_set2 = o3d.geometry.PointCloud()
+        pcd_set3 = o3d.geometry.PointCloud()
 
+        # Set the points for each set
+        pcd_set1.points = o3d.utility.Vector3dVector(data_infos['annos']['gt_boxes_upright_depth'])
+        pcd_set2.points = o3d.utility.Vector3dVector(result[0]['boxes_3d'].tensor.cpu().numpy())
+        pcd_set3.points = o3d.utility.Vector3dVector(filtered_boxes)
+
+        # Set colors for each set
+        color_set1 = [1, 0, 0]  # Red
+        color_set2 = [0, 0, 1]  # Blue
+        color_set3 = [0, 1, 0]
+
+        # Assign colors to points in each set
+        pcd_set1.colors = o3d.utility.Vector3dVector(np.tile(color_set1, (data_infos['annos']['gt_boxes_upright_depth'].shape[0], 1)))
+        pcd_set2.colors = o3d.utility.Vector3dVector(np.tile(color_set2, (result[0]['boxes_3d'].tensor.cpu().numpy().shape[0], 1)))
+        pcd_set3.colors = o3d.utility.Vector3dVector(np.tile(color_set3, (filtered_boxes.shape[0], 1)))
+        import pdb; pdb.set_trace()
+        # Visualize the point clouds together
+        o3d.visualization.draw_geometries([pcd_set1, pcd_set3])
+        '''
         if show:
             # Visualize the results of MMDetection3D model
             # 'show_results' is MMdetection3D visualization API
