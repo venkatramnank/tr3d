@@ -1,4 +1,4 @@
-voxel_size = .01 #NOTE: Increased voxel size
+voxel_size = .03 #NOTE: Increased voxel size
 n_points = 262144
 
 model = dict(
@@ -21,7 +21,7 @@ model = dict(
             label2level=[1]),
         bbox_loss=dict(type='ChamferDistance')),
     train_cfg=dict(),
-    test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.3))
+    test_cfg=dict(nms_pre=1000, iou_thr=0.5, score_thr=.3))
 
 optimizer = dict(type='AdamW', lr=.001, weight_decay=.0001)
 # optimizer = dict(type='SGD', lr=.001, weight_decay=.0001)
@@ -103,13 +103,13 @@ data = dict(
     samples_per_gpu=16,
     workers_per_gpu=4,
     persistent_workers=False,
-    num_frames_per_file = 30,
+    num_frames_per_file = 10,
     train=
         dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
-            ann_file=data_root+'train_onthefly_data.pkl',
+            ann_file=data_root+'train_support_may.pkl',
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
@@ -118,7 +118,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'val_onthefly_data.pkl',
+        ann_file=data_root + 'val_support_may.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
@@ -127,7 +127,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'val_onthefly_data_small.pkl',
+        ann_file=data_root + 'val_support_may_single.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,

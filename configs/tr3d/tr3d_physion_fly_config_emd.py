@@ -18,12 +18,12 @@ model = dict(
         assigner=dict(
             type='TR3DAssigner',
             top_pts_threshold=6,
-            label2level=[0]),
-        bbox_loss=dict(type='CornerBoundingBoxHuberLoss')),
+            label2level=[1]),
+        bbox_loss=dict(type='CornerBoundingBoxEMDLoss')),
     train_cfg=dict(),
     test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.3))
 
-optimizer = dict(type='AdamW', lr=.01, weight_decay=.0001)
+optimizer = dict(type='AdamW', lr=.001, weight_decay=.0001)
 # optimizer = dict(type='SGD', lr=.001, weight_decay=.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=10, norm_type=2))
 lr_config = dict(policy='step', warmup=None, step=[8, 11])
@@ -45,7 +45,6 @@ resume_from = None
 workflow = [('train', 1)]
 
 dataset_type = 'PhysionRandomFrameDataset'
-# data_root = '/media/kalyanav/Venkat/dominoes/'
 data_root = '/media/kalyanav/Venkat/support_data/'
 # class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
@@ -58,7 +57,7 @@ train_pipeline = [
     #     load_dim=6,
     #     use_dim=[0, 1, 2, 3, 4, 5]),
     dict(type='LoadAnnotations3D'),
-    # dict(type='PointSample', num_points=n_points),
+    dict(type='PointSample', num_points=n_points),
     # dict(
     #     type='RandomFlip3DPhysion'
     # ),
@@ -91,7 +90,7 @@ test_pipeline = [
         pts_scale_ratio=1,
         flip=False,
         transforms=[
-            # dict(type='PointSample', num_points=n_points),
+            dict(type='PointSample', num_points=n_points),
             # dict(type='NormalizePointsColor', color_mean=None),
             dict(
                 type='DefaultFormatBundle3D',
@@ -110,8 +109,7 @@ data = dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
-            # ann_file=data_root+'train_dominoes_data.pkl',
-            ann_file=data_root+'train_onthefly_data.pkl',
+            ann_file=data_root+'train_support_may.pkl',
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
@@ -120,8 +118,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        # ann_file=data_root + 'val_dominoes_data.pkl',
-        ann_file=data_root+'val_onthefly_data.pkl',
+        ann_file=data_root + 'val_support_may.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
@@ -130,8 +127,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        # ann_file=data_root + 'val_dominoes_data.pkl',
-        ann_file=data_root+'val_support_may_small.pkl',
+        ann_file=data_root + 'val_support_may_single.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
