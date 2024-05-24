@@ -131,7 +131,7 @@ data = dict(
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
         # ann_file=data_root + 'val_dominoes_data.pkl',
-        ann_file=data_root+'val_support_may_small.pkl',
+        ann_file=data_root+'val_support_may.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
