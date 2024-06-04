@@ -154,17 +154,5 @@ The mAP and mAR calcuations depend on the [exact 3D IOU](https://pytorch3d.org/d
     <img src="./resources/support3.png" alt="Image 3" style="width: 80%; display: inline-block;">
 </div>
 
-### Citation
 
-If you find this work useful for your research, please cite our paper:
-
-```
-@misc{rukhovich2023tr3d,
-  doi = {10.48550/ARXIV.2302.02858},
-  url = {https://arxiv.org/abs/2302.02858},
-  author = {Rukhovich, Danila and Vorontsova, Anna and Konushin, Anton},
-  title = {TR3D: Towards Real-Time Indoor 3D Object Detection},
-  publisher = {arXiv},
-  year = {2023}
-}
 ```
