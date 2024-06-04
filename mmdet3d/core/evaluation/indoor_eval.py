@@ -4,6 +4,7 @@ import torch
 from mmcv.utils import print_log
 from terminaltables import AsciiTable
 from scipy.optimize import linear_sum_assignment
+from physion.physion_nms import *
 
 def average_precision(recalls, precisions, mode='area'):
     """Calculate average precision (for single or multiple scales).
@@ -52,6 +53,37 @@ def average_precision(recalls, precisions, mode='area'):
             'Unrecognized mode, only "area" and "11points" are supported')
     return ap
 
+def iou_3d_physion(pred_corners, gt):
+    boxes1_corners = pred_corners
+    boxes2_corners = gt.corners
+    '''
+    tensor([1, 5, 4, 0, 3, 7, 6, 2])
+    tensor([1, 0, 2, 3, 5, 4, 6, 7])
+    tensor([3, 1, 0, 2, 7, 5, 4, 6])
+    '''
+    
+    #TODO: What if it is not axis aligned after you rotate? ALign according to one axis and then integrate the predicted with the GT (volume is covered)
+    #TODO: plot the corners in different colors to see what the order looks like
+    #TODO: Implement one to one correspondance matching. Match GT with pred corners
+        
+    corners_norm = torch.stack([
+        torch.Tensor([0.5, 0.5, 0.5]),
+        torch.Tensor([0.5, 0.5, -0.5]),
+        torch.Tensor([0.5, -0.5, 0.5]),
+        torch.Tensor([0.5, -0.5, -0.5]),
+        torch.Tensor([-0.5, 0.5, 0.5]),
+        torch.Tensor( [-0.5, 0.5, -0.5]),
+        torch.Tensor([-0.5, -0.5, 0.5]),
+        torch.Tensor([-0.5, -0.5, -0.5])            
+    ]).to(device=boxes2_corners.device, dtype=boxes2_corners.dtype)
+    
+    desired_order = torch.LongTensor([1,5,7,3,0,4,6,2]).to(boxes1_corners.device)
+    # desired_order = torch.LongTensor([0,1,2,3,4,5,6,7]).to(boxes1_corners.device)
+    rearranged_boxes1_corners = torch.index_select(boxes1_corners, dim=1, index=desired_order)
+    rearranged_boxes2_corners = torch.index_select(boxes2_corners, dim=1, index=desired_order)
+    _, iou = filtered_box3d_overlap(rearranged_boxes1_corners, rearranged_boxes2_corners, eps=1e-6)
+    return iou
+
 
 def eval_det_cls(pred, gt, iou_thr=None):
     """Generic functions to compute precision/recall for object detection for a
@@ -93,20 +125,18 @@ def eval_det_cls(pred, gt, iou_thr=None):
         cur_num = len(pred[img_id])
         if cur_num == 0:
             continue
-        pred_cur = torch.zeros((cur_num, 12), dtype=torch.float32)
+        pred_cur = torch.zeros((cur_num, 8, 3), dtype=torch.float32)
         box_idx = 0
-        for box, score in pred[img_id]:
+        for corner, score in pred[img_id]:
             image_ids.append(img_id)
             confidence.append(score)
-            pred_cur[box_idx] = box.tensor
+            pred_cur[box_idx] = corner
             box_idx += 1
-        pred_cur = box.new_box(pred_cur)
+        # pred_cur = box.new_box(pred_cur)
         gt_cur = class_recs[img_id]['bbox']
         if len(gt_cur) > 0:
             # calculate iou in each image
-            #TODO: Something is fishy here
-            # import pdb; pdb.set_trace()
-            iou_cur = pred_cur.overlaps(pred_cur, gt_cur)
+            iou_cur = iou_3d_physion(pred_cur, gt_cur)
             for i in range(cur_num):
                 ious.append(iou_cur[i])
         else:
@@ -238,6 +268,31 @@ def eval_center(pred, gt):
         
     return ret_values       
 
+
+
+def eval_map_recall_corners(pred, gt, ovthresh=None):
+    
+    ret_values = {}
+    for classname in gt.keys():
+        if classname in pred:
+            ret_values[classname] = eval_det_cls(pred[classname],
+                                                 gt[classname], ovthresh)
+    recall = [{} for i in ovthresh]
+    precision = [{} for i in ovthresh]
+    ap = [{} for i in ovthresh]
+
+    for label in gt.keys():
+        for iou_idx, thresh in enumerate(ovthresh):
+            if label in pred:
+                recall[iou_idx][label], precision[iou_idx][label], ap[iou_idx][
+                    label] = ret_values[label][iou_idx]
+            else:
+                recall[iou_idx][label] = np.zeros(1)
+                precision[iou_idx][label] = np.zeros(1)
+                ap[iou_idx][label] = np.zeros(1)
+
+    return recall, precision, ap
+
 def eval_map_recall(pred, gt, ovthresh=None):
     """Evaluate mAP and recall.
 
@@ -257,7 +312,6 @@ def eval_map_recall(pred, gt, ovthresh=None):
     ret_values = {}
     for classname in gt.keys():
         if classname in pred:
-            import pdb; pdb.set_trace()
             ret_values[classname] = eval_det_cls(pred[classname],
                                                  gt[classname], ovthresh)
     recall = [{} for i in ovthresh]

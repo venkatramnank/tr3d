@@ -210,7 +210,6 @@ def filtered_box3d_overlap(boxes1, boxes2, eps=1e-4):
 
     # Compute overlap for filtered boxes
     vol, iou = box3d_overlap(filtered_boxes1, filtered_boxes2, eps)
-
     # Map indices back to original boxes
     original_indices1 = torch.arange(len(boxes1))[mask1]
     original_indices2 = torch.arange(len(boxes2))[mask2]

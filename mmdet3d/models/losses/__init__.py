@@ -9,6 +9,8 @@ from .uncertain_smooth_l1_loss import UncertainL1Loss, UncertainSmoothL1Loss
 from .corner_mse_loss import CornerBoundingBoxLoss
 from .point_distance_loss import PointDistanceLoss
 from .corner_huber_loss import CornerBoundingBoxHuberLoss
+from .l2_geodesic_loss import l2_geodesic_loss
+from .corner_emd_loss import CornerBoundingBoxEMDLoss
 
 
 __all__ = [
@@ -16,5 +18,5 @@ __all__ = [
     'chamfer_distance', 'axis_aligned_iou_loss', 'AxisAlignedIoULoss',
     'PAConvRegularizationLoss', 'UncertainL1Loss', 'UncertainSmoothL1Loss',
     'MultiBinLoss', 'RotatedIoU3DLoss', 'CornerBoundingBoxLoss', 'PointDistanceLoss',
-    'CornerBoundingBoxHuberLoss'
+    'CornerBoundingBoxHuberLoss','l2_geodesic_loss', 'CornerBoundingBoxEMDLoss'
 ]

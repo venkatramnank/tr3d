@@ -117,8 +117,12 @@ def show_result_physion(
     
     if show:
         visualizer = PointCloudVisualizer()
+        import pdb; pdb.set_trace()
         visualizer.visualize_point_cloud_and_bboxes(points, pred_corners[:, :8, :], corners = pred_corners[:, :8, :].reshape(pred_corners[:, :8, :].shape[0]*pred_corners[:, :8, :].shape[1], 3), use_points=True, output_dir=out_dir, scene_name=filename, show=False, save=True)
+        # import pdb; pdb.set_trace()
         # visualizer.visualize_point_cloud_and_bboxes(points, gt_corners, corners = gt_corners.reshape(gt_corners.shape[0]*gt_corners.shape[1], 3), use_points=True, output_dir=out_dir, scene_name=filename, show=False, save=True)
+        #NOTE: both GT and pred
+        # visualizer.visualize_point_cloud_and_bboxes(points, np.concatenate((pred_corners[:, :8, :], gt_corners)), corners = np.concatenate((pred_corners[:, :8, :].reshape(pred_corners[:, :8, :].shape[0]*pred_corners[:, :8, :].shape[1], 3), gt_corners.reshape(gt_corners.shape[0]*gt_corners.shape[1], 3))), use_points=True, output_dir=out_dir, scene_name=filename, show=False, save=True)
         # try:
         #     visualizer.visualize_point_cloud_and_bboxes(points, gt_corners, corners = gt_corners.reshape(gt_corners.shape[0]*gt_corners.shape[1], 3), use_points=True, output_dir=out_dir, scene_name=filename, show=False, save=True)
         # except IndexError:

@@ -110,6 +110,7 @@ class TR3DHead(BaseModule):
     
     @staticmethod
     def bbox_to_corners(bbox, pos_points=None):
+        #TODO: Use this in iou calculation as well
         """Converts the center, h,w,l,ortho6d format into corners
 
         Args:
@@ -320,7 +321,6 @@ class TR3DHead(BaseModule):
         cls_loss = self.cls_loss(cls_preds, cls_targets)
         
         # bbox loss
-        #TODO: Need to unit test the loss
         pos_bbox_preds = bbox_preds[pos_mask]
         if pos_mask.sum() > 0:
             pos_points = points[pos_mask]
@@ -336,7 +336,6 @@ class TR3DHead(BaseModule):
             #         self._bbox_pred_to_bbox(pos_points, pos_bbox_preds)),
             #     self._bbox_to_loss(pos_bbox_targets)) 
             # print(points)
-            
             if type(self.bbox_loss).__name__ == 'ChamferDistance':
                  # in terms of chamfer distance you get two losses: from source and target. So we add them up!!    
                 src_loss, dst_loss = self.bbox_loss(
@@ -348,7 +347,7 @@ class TR3DHead(BaseModule):
                 bbox_loss = (src_loss + dst_loss).reshape(1)
                          
             else:
-
+                # import pdb; pdb.set_trace()
                 bbox_loss = self.bbox_loss(
                 self.bbox_to_corners(pos_bbox_preds, pos_points),
                 self.bbox_to_corners(pos_bbox_targets)
@@ -363,7 +362,54 @@ class TR3DHead(BaseModule):
         if bbox_loss is not None and bbox_loss.grad is not None: import pdb; pdb.set_trace()
         # import pdb; pdb.set_trace()
         return bbox_loss, cls_loss, pos_mask
+    ################*******************************************************************########################
+    def _add_pos_points(self, bbox, pos_points):
+        bbox[:, :3] = bbox[:, :3] + pos_points
+        return bbox
+    
+    def _loss_single_12d(self,
+                     bbox_preds,
+                     cls_preds,
+                     points,
+                     gt_bboxes,
+                     gt_labels,
+                     img_meta):
+        
+        assigned_ids = self.assigner.assign(points, gt_bboxes, gt_labels, img_meta)
+        bbox_preds = torch.cat(bbox_preds)
+        cls_preds = torch.cat(cls_preds)
+        points = torch.cat(points)
 
+        # cls loss
+        n_classes = cls_preds.shape[1]
+        pos_mask = assigned_ids >= 0
+
+        if len(gt_labels) > 0:
+            cls_targets = torch.where(pos_mask, gt_labels[assigned_ids], n_classes)
+        else:
+            cls_targets = gt_labels.new_full((len(pos_mask),), n_classes)
+        cls_loss = self.cls_loss(cls_preds, cls_targets)
+        
+        # bbox loss
+        pos_bbox_preds = bbox_preds[pos_mask]
+        if pos_mask.sum() > 0:
+            pos_points = points[pos_mask]
+            pos_bbox_preds = bbox_preds[pos_mask]
+            bbox_targets = torch.cat((gt_bboxes.tensor[:,:3], gt_bboxes.tensor[:, 3:]), dim=1)
+            pos_bbox_targets = bbox_targets.to(points.device)[assigned_ids][pos_mask]
+            bbox_loss = self.bbox_loss(self._add_pos_points(pos_bbox_preds, pos_points), pos_bbox_targets)
+            # center_loss, scale_loss, rotation_loss = self.bbox_loss(self._add_pos_points(pos_bbox_preds, pos_points), pos_bbox_targets)
+            
+        else:
+            # center_loss, scale_loss, rotation_loss = None
+            bbox_loss = None
+        # print('bbox_loss: ', bbox_loss)
+        # import pdb; pdb.set_trace()
+        # if bbox_loss is not None and bbox_loss.grad is not None: import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
+        return bbox_loss, cls_loss, pos_mask
+    
+    ################********************************************************************########################
     def _loss(self, bbox_preds, cls_preds, points,
               gt_bboxes, gt_labels, img_metas):
         bbox_losses, cls_losses, pos_masks = [], [], []
@@ -379,9 +425,11 @@ class TR3DHead(BaseModule):
                 bbox_losses.append(bbox_loss)
             cls_losses.append(cls_loss)
             pos_masks.append(pos_mask)
+        # import pdb; pdb.set_trace()
         return dict(
             bbox_loss=torch.mean(torch.cat(bbox_losses)),
             cls_loss=torch.sum(torch.cat(cls_losses)) / torch.sum(torch.cat(pos_masks)))
+        
 
     def forward_train(self, x, gt_bboxes, gt_labels, img_metas):
         bbox_preds, cls_preds, points = self(x)
@@ -528,7 +576,7 @@ class TR3DHead(BaseModule):
         order = scores.sort(0, descending=True)[1]
 
         boxes_corners = boxes_corners[order].contiguous()
-        desired_order = torch.LongTensor([3, 1, 0, 2, 7, 5, 4, 6]).to(boxes_corners.device)
+        desired_order = torch.LongTensor([1,5,7,3,0,4,6,2]).to(boxes_corners.device)
         rearranged_boxes_corners = torch.index_select(boxes_corners, dim=1, index=desired_order)
         try:
             # intersection_vol, iou_3d_vals = iou_3d(rearranged_boxes_corners, rearranged_boxes_corners, eps=1e-6)

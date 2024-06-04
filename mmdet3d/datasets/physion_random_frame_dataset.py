@@ -501,7 +501,7 @@ class PhysionRandomFrameDataset(Dataset):
          
             for i in range(len(det_anno['labels_3d'])):
                 label = det_anno['labels_3d'].numpy()[i]
-                bbox = det_anno['boxes_3d'].convert_to(box_mode_3d)[i]
+                bbox = det_anno['boxes_corners'][i]
                 score = det_anno['scores_3d'].numpy()[i]
 
                 if int(label) not in pred:
@@ -539,8 +539,8 @@ class PhysionRandomFrameDataset(Dataset):
                 if img_id not in gt[label]:
                     gt[label][img_id] = []
                 gt[label][img_id].append(bbox)
-        # import pdb; pdb.set_trace()
-        rec, prec, ap = eval_map_recall(pred, gt, metric)
+
+        rec, prec, ap = eval_map_recall_corners(pred, gt, metric)
         ret_dict = dict()
         header = ['classes']
         table_columns = [[label2cat[label]
@@ -813,7 +813,7 @@ class PhysionRandomFrameDataset(Dataset):
                  results,
                  indices_to_consider,
                  metric=None,
-                 iou_thr=(0.25, 0.5),
+                 iou_thr=(0.25, 0.5, 0.1),
                  logger=None,
                  show=False,
                  out_dir=None,

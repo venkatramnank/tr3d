@@ -401,10 +401,27 @@ class Physion3DBoxes(object):
         tensor([1, 0, 2, 3, 5, 4, 6, 7])
         tensor([3, 1, 0, 2, 7, 5, 4, 6])
         '''
-        # import pdb; pdb.set_trace()
-        desired_order = torch.LongTensor([1, 5, 4, 0, 3, 7, 6, 2]).to(boxes1_corners.device)
+        
+        #TODO: What if it is not axis aligned after you rotate? ALign according to one axis and then integrate the predicted with the GT (volume is covered)
+        #TODO: plot the corners in different colors to see what the order looks like
+        #TODO: Implement one to one correspondance matching. Match GT with pred corners
+         
+        corners_norm = torch.stack([
+            torch.Tensor([0.5, 0.5, 0.5]),
+            torch.Tensor([0.5, 0.5, -0.5]),
+            torch.Tensor([0.5, -0.5, 0.5]),
+            torch.Tensor([0.5, -0.5, -0.5]),
+            torch.Tensor([-0.5, 0.5, 0.5]),
+            torch.Tensor( [-0.5, 0.5, -0.5]),
+            torch.Tensor([-0.5, -0.5, 0.5]),
+            torch.Tensor([-0.5, -0.5, -0.5])            
+        ]).to(device=boxes2_corners.device, dtype=boxes2_corners.dtype)
+
+        # from physion.output_visualizer import visulize_corners_boxes
+        # visulize_corners_boxes(boxes1_corners.cpu().numpy())
+        desired_order = torch.LongTensor([1,5,7,3,0,4,6,2]).to(boxes1_corners.device)
+        # desired_order = torch.LongTensor([0,1,2,3,4,5,6,7]).to(boxes1_corners.device)
         rearranged_boxes1_corners = torch.index_select(boxes1_corners, dim=1, index=desired_order)
         rearranged_boxes2_corners = torch.index_select(boxes2_corners, dim=1, index=desired_order)
         _, iou = filtered_box3d_overlap(rearranged_boxes1_corners, rearranged_boxes2_corners, eps=1e-6)
-        
         return iou
