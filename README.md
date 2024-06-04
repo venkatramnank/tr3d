@@ -146,7 +146,11 @@ The mAP and mAR calcuations depend on the [exact 3D IOU](https://pytorch3d.org/d
 
 ### Example Detections
 
-<p align="center"><img src="./resources/github.png" alt="drawing" width="90%"/></p>
+<div style="display: flex; justify-content: center;">
+    <img src="./resources/support1.png" alt="Image 1" style="width: 30%;">
+    <img src="./resources/support2.png" alt="Image 2" style="width: 30%;">
+    <img src="./resources/support3.png" alt="Image 3" style="width: 30%;">
+</div>
 
 ### Citation
 
