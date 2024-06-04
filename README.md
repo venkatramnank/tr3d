@@ -1,6 +1,4 @@
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tr3d-towards-real-time-indoor-3d-object/3d-object-detection-on-scannetv2)](https://paperswithcode.com/sota/3d-object-detection-on-scannetv2?p=tr3d-towards-real-time-indoor-3d-object)
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tr3d-towards-real-time-indoor-3d-object/3d-object-detection-on-sun-rgbd-val)](https://paperswithcode.com/sota/3d-object-detection-on-sun-rgbd-val?p=tr3d-towards-real-time-indoor-3d-object)
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tr3d-towards-real-time-indoor-3d-object/3d-object-detection-on-s3dis)](https://paperswithcode.com/sota/3d-object-detection-on-s3dis?p=tr3d-towards-real-time-indoor-3d-object)
+
 
 ## TR3D-3dof: Towards Real-Time Indoor 3D Object Detection for 3-dof rotation
 
@@ -130,24 +128,21 @@ python physion/output_visualizer.py pilot_towers_nb2_fr015_SJ010_mono0_dis0_occ0
 ### Models
 
 The metrics are obtained in 5 training runs which utilizes the `support` type of videos. 
-The runs are on a single Nvidia RTX 3080Ti (12GB) GPU. The access the models will be shortly updated
+The runs are on a single Nvidia RTX 3080Ti (12GB) GPU. The following table is the result of validation runs.
+The mAP and mAR calcuations depend on the [exact 3D IOU](https://pytorch3d.org/docs/iou3d) that has been slightly modified to handle certain edge cases
+> **Note** : The access to the models will be shortly updated. Results for `dominoes` will also be updated.
 
 **TR3D 3D Detection**
 
-| Dataset | mAP@0.25 | mAP@0.5 | Scenes <br> per sec.| Download |
-|:-------:|:--------:|:-------:|:-------------------:|:--------:|
-| ScanNet | 72.9 (72.0) | 59.3 (57.4) | 23.7 | [model](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_scannet.pth) &#124; [log](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_scannet.log.json) &#124; [config](configs/tr3d/tr3d_scannet-3d-18class.py) |
-| SUN RGB-D | 67.1 (66.3) | 50.4 (49.6) | 27.5 | [model](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_sunrgbd.pth) &#124; [log](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_sunrgbd.log.json) &#124; [config](configs/tr3d/tr3d_sunrgbd-3d-10class.py) |
-| S3DIS | 74.5 (72.1) | 51.7 (47.6) | 21.0 | [model](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_s3dis.pth) &#124; [log](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_s3dis.log.json) &#124; [config](configs/tr3d/tr3d_s3dis-3d-5class.py) |
-| S3DIS <br> ScanNet-pretrained | 75.9 (75.1) | 56.6 (54.8) | 21.0 | [model](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_scannet-pretrain_s3dis.pth) &#124; [log](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_scannet-pretrain_s3dis.log) &#124; [config](configs/tr3d/tr3d_scannet-pretrain_s3dis-3d-5class.py) |
 
-**RGB + PC 3D Detection on SUN RGB-D**
+| Dataset | Loss | Class | AP 0.25 | AR 0.25 | AP 0.50 | AR 0.50 | Download |
+|---|---|---|---|---|---|---|---|
+| Physion Support | Corners + Huber loss | object | 0.1608 | 0.5322 | 0.0803 | 0.3606 |  TBA   |
+| Physion Support | Corners + Chamfer loss | object | 0.7278 | 0.8733 | 0.4813 | 0.7212 |  TBA   |
+| Physion Support | 12 direct + Huber loss | object | 0.6609 | 0.9669 | 0.2871 | 0.6472 |  TBA   |
 
-| Model | mAP@0.25 | mAP@0.5 | Scenes <br> per sec.| Download |
-|:-----:|:--------:|:-------:|:-------------------:|:--------:|
-| ImVoteNet | 63.4 | - | 14.8 | [instruction](configs/imvotenet) |
-| VoteNet+FF | 64.5 (63.7) | 39.2 (38.1) | - | [model](https://github.com/samsunglabs/tr3d/releases/download/v1.0/votenet_ff_sunrgbd.pth) &#124; [log](https://github.com/samsunglabs/tr3d/releases/download/v1.0/votenet_ff_sunrgbd.log.json) &#124; [config](configs/votenet/votenet-ff_16x8_sunrgbd-3d-10class.py) |
-| TR3D+FF | 69.4 (68.7) | 53.4 (52.4) | 17.5 | [model](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_ff_sunrgbd.pth) &#124; [log](https://github.com/samsunglabs/tr3d/releases/download/v1.0/tr3d_ff_sunrgbd.log.json) &#124; [config](configs/tr3d/tr3d-ff_sunrgbd-3d-10class.py) |
+> `corners` regards to usage of loss wrt the 8 corners obtained from the `12d` values learnt. `12d direct` regards to directly using thos values with the loss.
+
 
 ### Example Detections
 
