@@ -137,7 +137,7 @@ The mAP and mAR calcuations depend on the [exact 3D IOU](https://pytorch3d.org/d
 **TR3D 3D Detection**
 
 
-| Dataset | Loss | Class | AP 0.25 | AR 0.25 | AP 0.50 | AR 0.50 | Download |
+| Dataset | Loss | Class | AP@0.25 | AR@0.25 | AP@0.50 | AR@0.50 | Download |
 |---|---|---|---|---|---|---|---|
 | Physion Support | Corners + Huber loss | object | 0.1608 | 0.5322 | 0.0803 | 0.3606 |  TBA   |
 | Physion Support | Corners + Chamfer loss | object | 0.7278 | 0.8733 | 0.4813 | 0.7212 |  TBA   |
@@ -155,4 +155,4 @@ The mAP and mAR calcuations depend on the [exact 3D IOU](https://pytorch3d.org/d
 </div>
 
 
-```
+
