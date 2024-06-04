@@ -1,5 +1,5 @@
-voxel_size = .03 #NOTE: Increased voxel size
-n_points = 262144
+voxel_size = .03 #NOTE: Increased voxel size means lower CUDA usage
+n_points = 262144 # number of points in PCD
 
 model = dict(
     type='MinkSingleStage3DDetector',
@@ -12,14 +12,14 @@ model = dict(
     head=dict(
         type='TR3DHead',
         in_channels=128,
-        n_reg_outs=12,
-        n_classes=1,
+        n_reg_outs=12, # x,y,z,height, width, length, ortho6d
+        n_classes=1, # Number of classes
         voxel_size=voxel_size,
         assigner=dict(
             type='TR3DAssigner',
             top_pts_threshold=6,
             label2level=[0]),
-        bbox_loss=dict(type='CornerBoundingBoxHuberLoss')),
+        bbox_loss=dict(type='CornerBoundingBoxHuberLoss')), # BBOX loss function
     train_cfg=dict(),
     test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.3))
 
@@ -44,8 +44,8 @@ load_from = None
 resume_from = None
 workflow = [('train', 1)]
 
-dataset_type = 'PhysionRandomFrameDataset'
-data_root = '/media/kalyanav/Venkat/dominoes/'
+dataset_type = 'PhysionRandomFrameDataset' # Type of dataset
+data_root = '/media/kalyanav/Venkat/dominoes/' # Location of data
 # data_root = '/media/kalyanav/Venkat/support_data/'
 # class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
@@ -110,7 +110,7 @@ data = dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
-            ann_file=data_root+'train_dominoes_data.pkl',
+            ann_file=data_root+'train_dominoes_data.pkl', # Name of pkl file obtained through physion setup
             # ann_file=data_root+'train_onthefly_data.pkl',
             pipeline=train_pipeline,
             filter_empty_gt=False,
@@ -120,7 +120,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'val_dominoes_data.pkl',
+        ann_file=data_root + 'val_dominoes_data.pkl', # Name of pkl file obtained through physion setup
         # ann_file=data_root+'val_onthefly_data.pkl',
         pipeline=test_pipeline,
         classes=class_names,
@@ -130,7 +130,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'val_dominoes_small.pkl',
+        ann_file=data_root + 'val_dominoes_small.pkl', # Name of pkl file obtained through physion setup
         # ann_file=data_root+'val_support_may.pkl',
         pipeline=test_pipeline,
         classes=class_names,

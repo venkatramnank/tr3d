@@ -86,19 +86,28 @@ We follow the mmdetection3d data preparation protocol described in [scannet](dat
 
 For physion data preperation refer to [physion](physion).
 
+**Setting up config files**
+
+One can refer to `configs/tr3d/tr3d_physion_fly_config.py` as a template.
+
+
 **Training**
 
 To start training, run [train](tools/train.py) with TR3D [configs](configs/tr3d):
 ```shell
-python tools/train.py configs/tr3d/tr3d_scannet-3d-18class.py
+python tools/train.py configs/tr3d/tr3d_physion_fly_config.py
+```
+To train without validation:
+```shell
+python tools/train.py configs/tr3d/tr3d_physion_fly_config.py --no-validate
 ```
 
 **Testing**
 
 Test pre-trained model using [test](tools/dist_test.sh) with TR3D [configs](configs/tr3d):
 ```shell
-python tools/test.py configs/tr3d/tr3d_scannet-3d-18class.py \
-    work_dirs/tr3d_scannet-3d-18class/latest.pth --eval mAP
+python tools/test.py configs/tr3d/tr3d_physion_fly_config.py \
+    work_dirs/<location of trained model>.pth --eval mAP
 ```
 
 **Visualization**
@@ -107,15 +116,21 @@ Visualizations can be created with [test](tools/test.py) script.
 For better visualizations, you may set `score_thr` in configs to `0.3`:
 ```shell
 python tools/test.py configs/tr3d/tr3d_scannet-3d-18class.py \
-    work_dirs/tr3d_scannet-3d-18class/latest.pth --eval mAP --show \
-    --show-dir work_dirs/tr3d_scannet-3d-18class
+    work_dirs/tr3d_scannet-3d-18class/latest.pth --show \
+    --show-dir work_dirs/<location to store output visualizations>
+```
+
+The above command stores the output in the location provided.
+
+To view the output visualization:
+```shell
+python physion/output_visualizer.py pilot_towers_nb2_fr015_SJ010_mono0_dis0_occ0_tdwroom_unstable_0014<(location of file)>
 ```
 
 ### Models
 
-The metrics are obtained in 5 training runs followed by 5 test runs. We report both the best and the average values (the latter are given in round brackets).
-Inference speed (scenes per second) is measured on a single NVidia RTX 4090. Please, note that ScanNet-pretrained S3DIS model was actually trained in the original
-[openmmlab/mmdetection3d](https://github.com/open-mmlab/mmdetection3d/tree/main/projects/TR3D) codebase.
+The metrics are obtained in 5 training runs which utilizes the `support` type of videos. 
+The runs are on a single Nvidia RTX 3080Ti (12GB) GPU. The access the models will be shortly updated
 
 **TR3D 3D Detection**
 
