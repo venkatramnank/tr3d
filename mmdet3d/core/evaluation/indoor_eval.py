@@ -3,7 +3,8 @@ import numpy as np
 import torch
 from mmcv.utils import print_log
 from terminaltables import AsciiTable
-
+from scipy.optimize import linear_sum_assignment
+from physion.physion_nms import *
 
 def average_precision(recalls, precisions, mode='area'):
     """Calculate average precision (for single or multiple scales).
@@ -52,6 +53,37 @@ def average_precision(recalls, precisions, mode='area'):
             'Unrecognized mode, only "area" and "11points" are supported')
     return ap
 
+def iou_3d_physion(pred_corners, gt):
+    boxes1_corners = pred_corners
+    boxes2_corners = gt.corners
+    '''
+    tensor([1, 5, 4, 0, 3, 7, 6, 2])
+    tensor([1, 0, 2, 3, 5, 4, 6, 7])
+    tensor([3, 1, 0, 2, 7, 5, 4, 6])
+    '''
+    
+    #TODO: What if it is not axis aligned after you rotate? ALign according to one axis and then integrate the predicted with the GT (volume is covered)
+    #TODO: plot the corners in different colors to see what the order looks like
+    #TODO: Implement one to one correspondance matching. Match GT with pred corners
+        
+    corners_norm = torch.stack([
+        torch.Tensor([0.5, 0.5, 0.5]),
+        torch.Tensor([0.5, 0.5, -0.5]),
+        torch.Tensor([0.5, -0.5, 0.5]),
+        torch.Tensor([0.5, -0.5, -0.5]),
+        torch.Tensor([-0.5, 0.5, 0.5]),
+        torch.Tensor( [-0.5, 0.5, -0.5]),
+        torch.Tensor([-0.5, -0.5, 0.5]),
+        torch.Tensor([-0.5, -0.5, -0.5])            
+    ]).to(device=boxes2_corners.device, dtype=boxes2_corners.dtype)
+    
+    desired_order = torch.LongTensor([1,5,7,3,0,4,6,2]).to(boxes1_corners.device)
+    # desired_order = torch.LongTensor([0,1,2,3,4,5,6,7]).to(boxes1_corners.device)
+    rearranged_boxes1_corners = torch.index_select(boxes1_corners, dim=1, index=desired_order)
+    rearranged_boxes2_corners = torch.index_select(boxes2_corners, dim=1, index=desired_order)
+    _, iou = filtered_box3d_overlap(rearranged_boxes1_corners, rearranged_boxes2_corners, eps=1e-6)
+    return iou
+
 
 def eval_det_cls(pred, gt, iou_thr=None):
     """Generic functions to compute precision/recall for object detection for a
@@ -69,12 +101,13 @@ def eval_det_cls(pred, gt, iou_thr=None):
     """
 
     # {img_id: {'bbox': box structure, 'det': matched list}}
+    
     class_recs = {}
     npos = 0
     for img_id in gt.keys():
         cur_gt_num = len(gt[img_id])
         if cur_gt_num != 0:
-            gt_cur = torch.zeros([cur_gt_num, 7], dtype=torch.float32)
+            gt_cur = torch.zeros([cur_gt_num, 12], dtype=torch.float32) #TODO: See the 7 value?
             for i in range(cur_gt_num):
                 gt_cur[i] = gt[img_id][i].tensor
             bbox = gt[img_id][0].new_box(gt_cur)
@@ -83,7 +116,7 @@ def eval_det_cls(pred, gt, iou_thr=None):
         det = [[False] * len(bbox) for i in iou_thr]
         npos += len(bbox)
         class_recs[img_id] = {'bbox': bbox, 'det': det}
-
+  
     # construct dets
     image_ids = []
     confidence = []
@@ -92,18 +125,18 @@ def eval_det_cls(pred, gt, iou_thr=None):
         cur_num = len(pred[img_id])
         if cur_num == 0:
             continue
-        pred_cur = torch.zeros((cur_num, 7), dtype=torch.float32)
+        pred_cur = torch.zeros((cur_num, 8, 3), dtype=torch.float32)
         box_idx = 0
-        for box, score in pred[img_id]:
+        for corner, score in pred[img_id]:
             image_ids.append(img_id)
             confidence.append(score)
-            pred_cur[box_idx] = box.tensor
+            pred_cur[box_idx] = corner
             box_idx += 1
-        pred_cur = box.new_box(pred_cur)
+        # pred_cur = box.new_box(pred_cur)
         gt_cur = class_recs[img_id]['bbox']
         if len(gt_cur) > 0:
             # calculate iou in each image
-            iou_cur = pred_cur.overlaps(pred_cur, gt_cur)
+            iou_cur = iou_3d_physion(pred_cur, gt_cur)
             for i in range(cur_num):
                 ious.append(iou_cur[i])
         else:
@@ -111,12 +144,11 @@ def eval_det_cls(pred, gt, iou_thr=None):
                 ious.append(np.zeros(1))
 
     confidence = np.array(confidence)
-
     # sort by confidence
     sorted_ind = np.argsort(-confidence)
     image_ids = [image_ids[x] for x in sorted_ind]
     ious = [ious[x] for x in sorted_ind]
-
+  
     # go down dets and mark TPs and FPs
     nd = len(image_ids)
     tp_thr = [np.zeros(nd) for i in iou_thr]
@@ -126,7 +158,6 @@ def eval_det_cls(pred, gt, iou_thr=None):
         iou_max = -np.inf
         BBGT = R['bbox']
         cur_iou = ious[d]
-
         if len(BBGT) > 0:
             # compute overlaps
             for j in range(len(BBGT)):
@@ -135,7 +166,6 @@ def eval_det_cls(pred, gt, iou_thr=None):
                 if iou > iou_max:
                     iou_max = iou
                     jmax = j
-
         for iou_idx, thresh in enumerate(iou_thr):
             if iou_max > thresh:
                 if not R['det'][iou_idx][jmax]:
@@ -160,6 +190,108 @@ def eval_det_cls(pred, gt, iou_thr=None):
 
     return ret
 
+def match_coordinates(pred_centers, gt_centers, threshold=5.0):
+    """
+    Match predicted coordinates to ground truth coordinates based on  Hungarian matching.
+
+    Args:
+    pred_centers (torch.Tensor): Predicted centers of objects (N_pred x 2).
+    gt_centers (torch.Tensor): Ground truth centers of objects (N_gt x 2).
+    threshold (float): Threshold for matching (default: 5.0).
+
+    Returns:
+    list of tuple: List of matched indices (pred_idx, gt_idx).
+    """
+    # Convert tensors to numpy arrays
+    pred_centers_np = pred_centers.cpu().numpy()
+    gt_centers_np = gt_centers.cpu().numpy()
+
+    # Compute pairwise Euclidean distances between predicted and ground truth centers
+    distances = np.linalg.norm(pred_centers_np[:, np.newaxis, :] - gt_centers_np[np.newaxis, :, :], axis=-1)
+
+    # Apply threshold to distances
+    distances[distances > threshold] = np.inf
+    # Perform Hungarian matching
+    pred_idx, gt_idx = linear_sum_assignment(distances)
+
+    # Filter matches based on threshold
+    valid_matches = (distances[pred_idx, gt_idx] <= threshold)
+
+    # Convert matched indices to list of tuples
+    matches = [(pred_idx[i], gt_idx[i]) for i in range(len(pred_idx)) if valid_matches[i]]
+
+    return matches
+
+def eval_det_cls_center(pred, gt):
+    """Generic functions to compute distance for two points
+    """
+    #TODO: Change this to get good results
+    # {img_id: {'bbox': box structure, 'det': matched list}}
+    
+    class_recs = {}
+    for img_id in gt.keys():
+        cur_gt_num = len(gt[img_id])
+        if cur_gt_num != 0:
+            gt_cur = torch.zeros([cur_gt_num, 3], dtype=torch.float32) 
+            for i in range(cur_gt_num):
+                gt_cur[i] = gt[img_id][i].tensor
+            bbox = gt[img_id][0].new_box(gt_cur)
+        else:
+            bbox = gt[img_id]
+        class_recs[img_id] = {'bbox': bbox}
+    mses = []
+    for img_id in pred.keys():
+        gt_current_img = torch.cat([obj.tensor for obj in gt[img_id]])
+        pred_current_img = torch.cat([obj[0].tensor for obj in pred[img_id]])
+        matches = match_coordinates(pred_current_img, gt_current_img)
+        squared_errors = []
+
+        # Calculate squared errors for matched centers
+        for pred_idx, gt_idx in matches:
+            pred_coord = pred_current_img[pred_idx]
+            gt_coord = gt_current_img[gt_idx]
+            error = torch.sum((pred_coord - gt_coord) ** 2)
+            squared_errors.append(error.item())  # Convert tensor to Python scalar
+
+        # Compute mean squared error
+        mse = torch.tensor(squared_errors).mean().item()
+        mses.append(mse)
+
+    mean_mses = sum(mses)/len(mses)
+    return mean_mses
+
+def eval_center(pred, gt):
+    ret_values = {}
+    for classname in gt.keys():
+        ret_values[classname] = eval_det_cls_center(pred[classname],
+                                                 gt[classname])
+        
+    return ret_values       
+
+
+
+def eval_map_recall_corners(pred, gt, ovthresh=None):
+    
+    ret_values = {}
+    for classname in gt.keys():
+        if classname in pred:
+            ret_values[classname] = eval_det_cls(pred[classname],
+                                                 gt[classname], ovthresh)
+    recall = [{} for i in ovthresh]
+    precision = [{} for i in ovthresh]
+    ap = [{} for i in ovthresh]
+
+    for label in gt.keys():
+        for iou_idx, thresh in enumerate(ovthresh):
+            if label in pred:
+                recall[iou_idx][label], precision[iou_idx][label], ap[iou_idx][
+                    label] = ret_values[label][iou_idx]
+            else:
+                recall[iou_idx][label] = np.zeros(1)
+                precision[iou_idx][label] = np.zeros(1)
+                ap[iou_idx][label] = np.zeros(1)
+
+    return recall, precision, ap
 
 def eval_map_recall(pred, gt, ovthresh=None):
     """Evaluate mAP and recall.
@@ -177,7 +309,6 @@ def eval_map_recall(pred, gt, ovthresh=None):
     Return:
         tuple[dict]: dict results of recall, AP, and precision for all classes.
     """
-
     ret_values = {}
     for classname in gt.keys():
         if classname in pred:
@@ -228,6 +359,7 @@ def indoor_eval(gt_annos,
     Return:
         dict[str, float]: Dict of results.
     """
+    
     assert len(dt_annos) == len(gt_annos)
     pred = {}  # map {class_id: pred}
     gt = {}  # map {class_id: gt}
@@ -247,9 +379,14 @@ def indoor_eval(gt_annos,
             if img_id not in gt[label]:
                 gt[int(label)][img_id] = []
             pred[int(label)][img_id].append((bbox, score))
-
         # parse gt annotations
         gt_anno = gt_annos[img_id]
+        # if len(gt_anno['gt_labels_3d']) > 0:
+        #     gt_boxes = gt_anno['gt_bboxes_3d']
+        #     labels_3d = gt_anno['gt_labels_3d']
+        # else:
+        #     gt_boxes = box_type_3d(np.array([], dtype=np.float32))
+        #     labels_3d = np.array([], dtype=np.int64)
         if gt_anno['gt_num'] != 0:
             gt_boxes = box_type_3d(
                 gt_anno['gt_boxes_upright_depth'],
@@ -259,6 +396,123 @@ def indoor_eval(gt_annos,
         else:
             gt_boxes = box_type_3d(np.array([], dtype=np.float32))
             labels_3d = np.array([], dtype=np.int64)
+
+        for i in range(len(labels_3d)):
+            label = labels_3d[i]
+            bbox = gt_boxes[i]
+            if label not in gt:
+                gt[label] = {}
+            if img_id not in gt[label]:
+                gt[label][img_id] = []
+            gt[label][img_id].append(bbox)
+
+    rec, prec, ap = eval_map_recall(pred, gt, metric)
+    ret_dict = dict()
+    header = ['classes']
+    table_columns = [[label2cat[label]
+                      for label in ap[0].keys()] + ['Overall']]
+
+    for i, iou_thresh in enumerate(metric):
+        header.append(f'AP_{iou_thresh:.2f}')
+        header.append(f'AR_{iou_thresh:.2f}')
+        rec_list = []
+        for label in ap[i].keys():
+            ret_dict[f'{label2cat[label]}_AP_{iou_thresh:.2f}'] = float(
+                ap[i][label][0])
+        ret_dict[f'mAP_{iou_thresh:.2f}'] = float(
+            np.mean(list(ap[i].values())))
+
+        table_columns.append(list(map(float, list(ap[i].values()))))
+        table_columns[-1] += [ret_dict[f'mAP_{iou_thresh:.2f}']]
+        table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+        for label in rec[i].keys():
+            ret_dict[f'{label2cat[label]}_rec_{iou_thresh:.2f}'] = float(
+                rec[i][label][-1])
+            rec_list.append(rec[i][label][-1])
+        ret_dict[f'mAR_{iou_thresh:.2f}'] = float(np.mean(rec_list))
+
+        table_columns.append(list(map(float, rec_list)))
+        table_columns[-1] += [ret_dict[f'mAR_{iou_thresh:.2f}']]
+        table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+    table_data = [header]
+    table_rows = list(zip(*table_columns))
+    table_data += table_rows
+    table = AsciiTable(table_data)
+    table.inner_footing_row_border = True
+    print_log('\n' + table.table, logger=logger)
+
+    return ret_dict
+
+
+
+def indoor_eval_physion(gt_annos,
+                dt_annos,
+                metric,
+                label2cat,
+                logger=None,
+                box_type_3d=None,
+                box_mode_3d=None):
+    """Indoor Evaluation modified for physion
+
+    Evaluate the result of the detection.
+
+    Args:
+        gt_annos (list[dict]): Ground truth annotations.
+        dt_annos (list[dict]): Detection annotations. the dict
+            includes the following keys
+
+            - labels_3d (torch.Tensor): Labels of boxes.
+            - boxes_3d (:obj:`BaseInstance3DBoxes`):
+                3D bounding boxes in Depth coordinate.
+            - scores_3d (torch.Tensor): Scores of boxes.
+        metric (list[float]): IoU thresholds for computing average precisions.
+        label2cat (dict): Map from label to category.
+        logger (logging.Logger | str, optional): The way to print the mAP
+            summary. See `mmdet.utils.print_log()` for details. Default: None.
+
+    Return:
+        dict[str, float]: Dict of results.
+    """
+    #TODO: implement batch processing
+    # import pdb; pdb.set_trace()
+    assert len(dt_annos) == len(gt_annos)
+    pred = {}  # map {class_id: pred}
+    gt = {}  # map {class_id: gt}
+    for img_id in range(len(dt_annos)):
+        det_anno = dt_annos[img_id]
+        for i in range(len(det_anno['labels_3d'])):
+            label = det_anno['labels_3d'].numpy()[i]
+            bbox = det_anno['boxes_3d'].convert_to(box_mode_3d)[i]
+            score = det_anno['scores_3d'].numpy()[i]
+
+            if int(label) not in pred:
+                pred[int(label)] = {}
+            if img_id not in pred[int(label)]:
+                pred[int(label)][img_id] = []
+            if int(label) not in gt:
+                gt[int(label)] = {}
+            if img_id not in gt[int(label)]:
+                gt[int(label)][img_id] = []
+            pred[int(label)][img_id].append((bbox, score))
+
+        gt_anno = gt_annos[img_id]
+        if len(gt_anno['gt_labels_3d']) > 0:
+            gt_boxes = gt_anno['gt_bboxes_3d']
+            labels_3d = gt_anno['gt_labels_3d']
+        else:
+            gt_boxes = box_type_3d(np.array([], dtype=np.float32))
+            labels_3d = np.array([], dtype=np.int64)
+        # if gt_anno['gt_num'] != 0:
+        #     gt_boxes = box_type_3d(
+        #         gt_anno['gt_boxes_upright_depth'],
+        #         box_dim=gt_anno['gt_boxes_upright_depth'].shape[-1],
+        #         origin=(0.5, 0.5, 0.5)).convert_to(box_mode_3d)
+        #     labels_3d = gt_anno['class']
+        # else:
+        #     gt_boxes = box_type_3d(np.array([], dtype=np.float32))
+        #     labels_3d = np.array([], dtype=np.int64)
 
         for i in range(len(labels_3d)):
             label = labels_3d[i]

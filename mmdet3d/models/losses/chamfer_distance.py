@@ -134,7 +134,6 @@ class ChamferDistance(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-
         loss_source, loss_target, indices1, indices2 = chamfer_distance(
             source, target, src_weight, dst_weight, self.mode, reduction)
 
@@ -145,3 +144,5 @@ class ChamferDistance(nn.Module):
             return loss_source, loss_target, indices1, indices2
         else:
             return loss_source, loss_target
+        
+

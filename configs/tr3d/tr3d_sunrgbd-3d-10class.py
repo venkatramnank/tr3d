@@ -44,7 +44,7 @@ resume_from = None
 workflow = [('train', 1)]
 
 dataset_type = 'SUNRGBDDataset'
-data_root = 'data/sunrgbd/'
+data_root = '/home/kalyanav/MS_thesis/sun_rgbd_data/'
 class_names = ('bed', 'table', 'sofa', 'chair', 'toilet', 'desk', 'dresser',
                'night_stand', 'bookshelf', 'bathtub')
 train_pipeline = [
@@ -97,7 +97,7 @@ test_pipeline = [
 ]
 data = dict(
     samples_per_gpu=16,
-    workers_per_gpu=4,
+    workers_per_gpu=0,
     train=dict(
         type='RepeatDataset',
         times=5,

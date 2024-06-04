@@ -506,7 +506,6 @@ class LoadPointsFromFile(object):
                     points.shape[1] - 2,
                     points.shape[1] - 1,
                 ]))
-
         points_class = get_points_type(self.coord_type)
         points = points_class(
             points, points_dim=points.shape[-1], attribute_dims=attribute_dims)

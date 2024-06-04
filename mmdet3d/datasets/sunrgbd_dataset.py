@@ -6,6 +6,7 @@ import numpy as np
 
 from mmdet3d.core import show_multi_modality_result, show_result_v2
 from mmdet3d.core.bbox import DepthInstance3DBoxes
+from mmdet3d.core.bbox.structures.physion_box3d import Physion3DBoxes
 from mmdet.core import eval_map
 from .builder import DATASETS
 from .custom_3d import Custom3DDataset
@@ -143,10 +144,20 @@ class SUNRGBDDataset(Custom3DDataset):
         else:
             gt_bboxes_3d = np.zeros((0, 7), dtype=np.float32)
             gt_labels_3d = np.zeros((0, ), dtype=np.int64)
+            
+        ######################################################################################################################################################   
+        #Testing the new physion box structure
 
+        # gt_bboxes_3d = Physion3DBoxes(gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
+        # import pdb; pdb.set_trace()
+        ###################################################################################################################################################### 
+        
         # to target box structure
         gt_bboxes_3d = DepthInstance3DBoxes(
             gt_bboxes_3d, origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
+        
+        
+        
 
         anns_results = dict(
             gt_bboxes_3d=gt_bboxes_3d, gt_labels_3d=gt_labels_3d)

@@ -223,6 +223,7 @@ class Custom3DDataset(Dataset):
             dict: Training data dict of the corresponding index.
         """
         input_dict = self.get_data_info(index)
+        import pdb; pdb.set_trace()
         if input_dict is None:
             return None
         self.pre_pipeline(input_dict)
@@ -328,6 +329,7 @@ class Custom3DDataset(Dataset):
             dict: Evaluation results.
         """
         from mmdet3d.core.evaluation import indoor_eval
+        from mmdet3d.core.evaluation.indoor_eval import indoor_eval_physion
         assert isinstance(
             results, list), f'Expect results to be list, got {type(results)}.'
         assert len(results) > 0, 'Expect length of results > 0.'
@@ -337,7 +339,15 @@ class Custom3DDataset(Dataset):
         ), f'Expect elements in results to be dict, got {type(results[0])}.'
         gt_annos = [info['annos'] for info in self.data_infos]
         label2cat = {i: cat_id for i, cat_id in enumerate(self.CLASSES)}
-        ret_dict = indoor_eval(
+        # ret_dict = indoor_eval(
+        #     gt_annos,
+        #     results,
+        #     iou_thr,
+        #     label2cat,
+        #     logger=logger,
+        #     box_type_3d=self.box_type_3d,
+        #     box_mode_3d=self.box_mode_3d)
+        ret_dict = indoor_eval_physion(
             gt_annos,
             results,
             iou_thr,
