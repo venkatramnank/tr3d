@@ -2,15 +2,9 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tr3d-towards-real-time-indoor-3d-object/3d-object-detection-on-sun-rgbd-val)](https://paperswithcode.com/sota/3d-object-detection-on-sun-rgbd-val?p=tr3d-towards-real-time-indoor-3d-object)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tr3d-towards-real-time-indoor-3d-object/3d-object-detection-on-s3dis)](https://paperswithcode.com/sota/3d-object-detection-on-s3dis?p=tr3d-towards-real-time-indoor-3d-object)
 
-## TR3D: Towards Real-Time Indoor 3D Object Detection
+## TR3D-3dof: Towards Real-Time Indoor 3D Object Detection for 3-dof rotation
 
-**News**:
- * :fire: June, 2023. TR3D is accepted at [ICIP2023](https://2023.ieeeicip.org/).
- * :rocket: June, 2023. We add ScanNet-pretrained S3DIS model and log significantly pushing forward state-of-the-art.
- * February, 2023. TR3D on all 3 datasets is now supported in [mmdetection3d](https://github.com/open-mmlab/mmdetection3d) as a [project](https://github.com/open-mmlab/mmdetection3d/tree/main/projects/TR3D).
- * :fire: February, 2023. TR3D is now state-of-the-art on [paperswithcode](https://paperswithcode.com) on SUN RGB-D and S3DIS.
-
-This repository contains an implementation of TR3D, a 3D object detection method introduced in our paper:
+This repository contains an implementation of TR3D, a 3D object detection method introduced in the paper:
 
 > **TR3D: Towards Real-Time Indoor 3D Object Detection**<br>
 > [Danila Rukhovich](https://github.com/filaPro),
@@ -20,10 +14,12 @@ This repository contains an implementation of TR3D, a 3D object detection method
 > Samsung Research<br>
 > https://arxiv.org/abs/2302.02858
 
-### Installation
-For convenience, we provide a [Dockerfile](docker/Dockerfile).
+The following implementation of TR3D accounts for all three rotation in all 3 dimensions (axes), i.e. yaw, pitch and roll.
 
-Alternatively, you can install all required packages manually. This implementation is based on [mmdetection3d](https://github.com/open-mmlab/mmdetection3d) framework.
+### Installation
+
+
+You can install all required packages manually. This implementation is based on [mmdetection3d](https://github.com/open-mmlab/mmdetection3d) framework.
 Please refer to the original installation guide [getting_started.md](docs/en/getting_started.md), including MinkowskiEngine installation, replacing `open-mmlab/mmdetection3d` with `samsunglabs/tr3d`.
 
 
@@ -33,10 +29,62 @@ Most of the `TR3D`-related code locates in the following files:
 [dense_heads/tr3d_head.py](mmdet3d/models/dense_heads/tr3d_head.py),
 [necks/tr3d_neck.py](mmdet3d/models/necks/tr3d_neck.py).
 
+
+
+<details>
+  <summary>Click to expand installation trials</summary>
+
+| Software                 | Version           | Status                                 |
+|--------------------------|-------------------|-----------------------------------------|
+| CUDA                     | 11.3              | Cannot Install : Due to the driver version mismatch |
+| CUDA                     | 11.7              | Cannot Install : Due to the driver version mismatch |
+| CUDA                     | 12.3              | Working                                 |
+| Pytorch                  | 1.12.1 + cu 11.3  | Working                                 |
+| cudatoolkit              | 11.7              | Working                                 |
+| cudatoolkit              | 11.3              | Cannot Install X : Due to unmet dependencies |
+| Minkowski Engine         | 0.5.3             | Working                                 |
+| gcc and g++ (important)  | 9.5.0             | Working  
+</details>
+
+#### Steps to install TR3D package and Minkowski engine
+Create a conda env with python 3.8
+```bash
+conda create -n tr3d python=3.8
+```
+
+Use the above version of packages and install them. You may refer to https://github.com/SamsungLabs/tr3d/blob/main/docker/Dockerfile  for the versions of all the packages.
+
+Set the gcc and g++ to be of version 9.5.0 (or upto 10)
+
+Make sure nvcc is installed
+
+```bash
+nvcc --version
+```
+
+Clone the Minkowski Engine repository and make sure to follow the below instructions
+
+
+```bash
+export CUDA_HOME=/usr/local/cuda-11.x
+pip install -U git+https://github.com/NVIDIA/MinkowskiEngine -v --no-deps --install-option="--blas_include_dirs=${CONDA_PREFIX}/include" --install-option="--blas=openblas"
+# Or if you want local MinkowskiEngine
+git clone https://github.com/NVIDIA/MinkowskiEngine.git
+cd MinkowskiEngine
+python setup.py install --blas_include_dirs=${CONDA_PREFIX}/include --blas=openblas
+```
+
+The code that worked for my system (Ubuntu 20.04 with CUDA 12.1)
+```bash
+pip install -U git+https://github.com/NVIDIA/MinkowskiEngine -v --no-deps
+```
+
 ### Getting Started
 
 Please see [getting_started.md](docs/getting_started.md) for basic usage examples.
 We follow the mmdetection3d data preparation protocol described in [scannet](data/scannet), [sunrgbd](data/sunrgbd), and [s3dis](data/s3dis).
+
+For physion data preperation refer to [physion](physion).
 
 **Training**
 
