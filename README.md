@@ -95,6 +95,7 @@ To start training, run [train](tools/train.py) with TR3D [configs](configs/tr3d)
 ```shell
 python tools/train.py configs/tr3d/tr3d_physion_fly_config.py
 ```
+>**Note**: In order to control the interval of evaluation, change interval at [this line](mmdet3d/apis/train.py#L312)
 To train without validation:
 ```shell
 python tools/train.py configs/tr3d/tr3d_physion_fly_config.py --no-validate
@@ -146,10 +147,10 @@ The mAP and mAR calcuations depend on the [exact 3D IOU](https://pytorch3d.org/d
 
 ### Example Detections
 
-<div style="display: flex; justify-content: center;">
-    <img src="./resources/support1.png" alt="Image 1" style="width: 30%;">
-    <img src="./resources/support2.png" alt="Image 2" style="width: 30%;">
-    <img src="./resources/support3.png" alt="Image 3" style="width: 30%;">
+<div style="text-align: center;">
+    <img src="./resources/support1.png" alt="Image 1" style="width: 80%; display: inline-block;">
+    <img src="./resources/support2.png" alt="Image 2" style="width: 80%; display: inline-block;">
+    <img src="./resources/support3.png" alt="Image 3" style="width: 80%; display: inline-block;">
 </div>
 
 ### Citation
