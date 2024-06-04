@@ -5,6 +5,7 @@ import mmcv
 import numpy as np
 import trimesh
 import matplotlib.pyplot as plt
+from physion.physion_tools import PointCloudVisualizer, convert_to_world_coords
 
 from .image_vis import (draw_camera_bbox3d_on_img, draw_depth_bbox3d_on_img,
                         draw_lidar_bbox3d_on_img)
@@ -91,7 +92,39 @@ def _write_oriented_bbox_v2(corners, labels, out_filename):
                     file.write(f' {j + l}')
                 file.write('\n')
 
+def show_result_physion(
+    points,
+    gt_bboxes,
+    pred_bboxes,
+    out_dir,
+    filename,
+    pred_corners = None,
+    gt_corners = None, 
+    show = False,
+    pred_labels = None
+):
 
+    # result_path = osp.join(out_dir, filename)
+    # mmcv.mkdir_or_exist(result_path)
+    
+    
+    # getting the world coordinates points from canonical coordinates
+    
+    pred_bboxes_world_coords = convert_to_world_coords(pred_bboxes)
+    
+    if gt_bboxes.any():
+        gt_bboxes_world_coords = convert_to_world_coords(gt_bboxes)
+    
+    if show:
+        visualizer = PointCloudVisualizer()
+        visualizer.visualize_point_cloud_and_bboxes(points, pred_corners[:, :8, :], corners = pred_corners[:, :8, :].reshape(pred_corners[:, :8, :].shape[0]*pred_corners[:, :8, :].shape[1], 3), use_points=True, output_dir=out_dir, scene_name=filename, show=False, save=True)
+        # visualizer.visualize_point_cloud_and_bboxes(points, gt_corners, corners = gt_corners.reshape(gt_corners.shape[0]*gt_corners.shape[1], 3), use_points=True, output_dir=out_dir, scene_name=filename, show=False, save=True)
+        # try:
+        #     visualizer.visualize_point_cloud_and_bboxes(points, gt_corners, corners = gt_corners.reshape(gt_corners.shape[0]*gt_corners.shape[1], 3), use_points=True, output_dir=out_dir, scene_name=filename, show=False, save=True)
+        # except IndexError:
+        #     import pdb; pdb.set_trace()
+    
+    
 def show_result(points,
                 gt_bboxes,
                 pred_bboxes,
@@ -144,7 +177,7 @@ def show_result(points,
             vis.add_bboxes(bbox3d=gt_bboxes, bbox_color=(0, 0, 1))
         show_path = osp.join(result_path,
                              f'{filename}_online.png') if snapshot else None
-        import pdb;pdb.set_trace()
+        # import pdb;pdb.set_trace()
         vis.show(show_path)
 
     if points is not None:

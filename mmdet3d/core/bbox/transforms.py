@@ -47,7 +47,7 @@ def bbox3d2roi(bbox_list):
     return rois
 
 
-def bbox3d2result(bboxes, scores, labels, attrs=None):
+def bbox3d2result(bboxes, scores, labels, boxes_corners=None, attrs=None):
     """Convert detection results to a list of numpy arrays.
 
     Args:
@@ -65,10 +65,19 @@ def bbox3d2result(bboxes, scores, labels, attrs=None):
             - labels_3d (torch.Tensor): Box labels.
             - attrs_3d (torch.Tensor, optional): Box attributes.
     """
-    result_dict = dict(
-        boxes_3d=bboxes.to('cpu'),
-        scores_3d=scores.cpu(),
-        labels_3d=labels.cpu())
+
+    if boxes_corners is not None:
+        result_dict = dict(
+            boxes_3d=bboxes.to('cpu'),
+            scores_3d=scores.cpu(),
+            labels_3d=labels.cpu(),
+            boxes_corners= boxes_corners.cpu())
+    
+    else:
+        result_dict = dict(
+            boxes_3d=bboxes.to('cpu'),
+            scores_3d=scores.cpu(),
+            labels_3d=labels.cpu())
 
     if attrs is not None:
         result_dict['attrs_3d'] = attrs.cpu()

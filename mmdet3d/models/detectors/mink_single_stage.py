@@ -12,6 +12,7 @@ from mmdet3d.models import DETECTORS, build_backbone, build_head, build_neck
 from .base import Base3DDetector
 from tools.data_converter.voxelize_mlpointconvformer import *
 from mmdet3d.core.visualizer.open3d_vis import Visualizer
+from physion.physion_tools import PointCloudVisualizer, convert_to_world_coords
 
 
 @DETECTORS.register_module()
@@ -64,15 +65,17 @@ class MinkSingleStage3DDetector(Base3DDetector):
             SparseTensor: Voxelized point clouds.
         """
        # voxelization with voxel size of 0.05 
-        
-        points = [p[voxelize(p[:, :3], self.voxel_size)] for p in points]  # [65536 x 6] [] [] ... b #TODO: visualize it once
+        # points = [p[voxelize(p[:, :3], self.voxel_size)] for p in points]  # [65536 x 6] [] [] ... b #TODO: visualize it once
         # import pdb; pdb.set_trace()
-        # coordinates, features = ME.utils.batch_sparse_collate(
-        #     [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
-        #     device=points[0].device) 
+        # visualizer = PointCloudVisualizer()
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes[0].tensor.cpu().numpy())
         coordinates, features = ME.utils.batch_sparse_collate(
-            [(p[:, :3], p[:, 3:]) for p in points],
+            [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
             device=points[0].device) 
+        # coordinates, features = ME.utils.batch_sparse_collate(
+        #     [(p[:, :3], p[:, 3:]) for p in points],
+        #     device=points[0].device) 
         #collates all the points in the batch. Total number of points x 4 [batch number, x, y, z]
         # features shape is (total number of points x 3)[r,g,b]
         x = ME.SparseTensor(coordinates=coordinates, features=features)
@@ -94,17 +97,25 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             dict: Centerness, bbox and classification loss values.
         """
-        import pdb; pdb.set_trace()
         ######################################################################################
-        # visualizing the points and gt_bboxes_3d to make sure it is alright
-        vis = Visualizer(points, bbox3d=np.asarray(gt_bboxes_3d), mode="xyzrgb", center_mode="physion", rot_axis=1)
-        vis.show()
+        # import pdb; pdb.set_trace()
+        # # visualizing the points and gt_bboxes_3d to make sure it is alright
+        # visualizer = PointCloudVisualizer()
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), corners=gt_bboxes_3d[0].corners.reshape(gt_bboxes_3d[0].tensor.shape[0]*8,3).cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
+        # visualizer.visualize_point_cloud_and_bboxes(points[0].cpu().numpy(), gt_bboxes_3d[0].corners.cpu().numpy(), use_points=True, center=gt_bboxes_3d[0].tensor.cpu().numpy()[:,:3], show=True)
         #####################################################################################
         x = self.extract_feats(points)
-        # import pdb; pdb.set_trace()
         losses = self.head.forward_train(x, gt_bboxes_3d, gt_labels_3d,
                                          img_metas)
         return losses
+
+
+    def _box3dcornertoresult(self, bbox_corners, cls_preds):
+        result_dict = dict(
+            boxes_corners = bbox_corners.to('cpu'),
+            cls_preds = [cls_preds[0].to('cpu'), cls_preds[1].to('cpu')]
+        )
+        return result_dict
 
     def simple_test(self, points, img_metas, *args, **kwargs):
         """Test without augmentations.
@@ -116,12 +127,22 @@ class MinkSingleStage3DDetector(Base3DDetector):
         Returns:
             list[dict]: Predicted 3d boxes.
         """
+
+        
         x = self.extract_feats(points)
         bbox_list = self.head.forward_test(x, img_metas)
         bbox_results = [
-            bbox3d2result(bboxes, scores, labels)
-            for bboxes, scores, labels in bbox_list
+            bbox3d2result(bboxes, scores, labels, boxes_corners)
+            for bboxes, scores, labels, boxes_corners in bbox_list
         ]
+        
+        # NOTE: for center only
+        # bbox_results = [
+        #     bbox3d2result(bboxes, scores, labels)
+        #     for bboxes, scores, labels in bbox_list
+        # ]
+        # bbox_results = [self._box3dcornertoresult(bbox_corners, cls_preds)
+        #                 for bbox_corners, cls_preds in bbox_list]
         return bbox_results
 
     def aug_test(self, points, img_metas, **kwargs):
