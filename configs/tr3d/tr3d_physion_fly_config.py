@@ -27,7 +27,7 @@ optimizer = dict(type='AdamW', lr=.01, weight_decay=.0001)
 # optimizer = dict(type='SGD', lr=.001, weight_decay=.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=10, norm_type=2))
 lr_config = dict(policy='step', warmup=None, step=[8, 11])
-runner = dict(type='EpochBasedRunner', max_epochs=5)
+runner = dict(type='EpochBasedRunner', max_epochs=8)
 custom_hooks = [dict(type='EmptyCacheHook', after_iter=True)]
 
 checkpoint_config = dict(interval=1, max_keep_ckpts=1)
@@ -45,8 +45,8 @@ resume_from = None
 workflow = [('train', 1)]
 
 dataset_type = 'PhysionRandomFrameDataset'
-# data_root = '/media/kalyanav/Venkat/dominoes/'
-data_root = '/media/kalyanav/Venkat/support_data/'
+data_root = '/media/kalyanav/Venkat/dominoes/'
+# data_root = '/media/kalyanav/Venkat/support_data/'
 # class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
 train_pipeline = [
@@ -104,14 +104,14 @@ data = dict(
     samples_per_gpu=16,
     workers_per_gpu=4,
     persistent_workers=False,
-    num_frames_per_file = 10,
+    num_frames_per_file = 15,
     train=
         dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
-            # ann_file=data_root+'train_dominoes_data.pkl',
-            ann_file=data_root+'train_onthefly_data.pkl',
+            ann_file=data_root+'train_dominoes_data.pkl',
+            # ann_file=data_root+'train_onthefly_data.pkl',
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
@@ -120,8 +120,8 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        # ann_file=data_root + 'val_dominoes_data.pkl',
-        ann_file=data_root+'val_onthefly_data.pkl',
+        ann_file=data_root + 'val_dominoes_data.pkl',
+        # ann_file=data_root+'val_onthefly_data.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
@@ -130,8 +130,8 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        # ann_file=data_root + 'val_dominoes_data.pkl',
-        ann_file=data_root+'val_support_may.pkl',
+        ann_file=data_root + 'val_dominoes_small.pkl',
+        # ann_file=data_root+'val_support_may.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,

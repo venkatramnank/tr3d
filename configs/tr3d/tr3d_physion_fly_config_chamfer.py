@@ -45,7 +45,7 @@ resume_from = None
 workflow = [('train', 1)]
 
 dataset_type = 'PhysionRandomFrameDataset'
-data_root = '/media/kalyanav/Venkat/support_data/'
+data_root = '/media/kalyanav/Venkat/dominoes/'
 # class_names = ['cloth_square', 'buddah', 'bowl', 'cone', 'cube', 'cylinder', 'dumbbell', 'octahedron', 'pentagon', 'pipe', 'platonic', 'pyramid', 'sphere', 'torus', 'triangular_prism']
 class_names = ['object']
 train_pipeline = [
@@ -109,7 +109,7 @@ data = dict(
             type=dataset_type,
             modality=dict(use_camera=False, use_lidar=True),
             data_root=data_root,
-            ann_file=data_root+'train_support_may.pkl',
+            ann_file=data_root+'train_dominoes_data.pkl',
             pipeline=train_pipeline,
             filter_empty_gt=False,
             classes=class_names,
@@ -118,7 +118,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'val_support_may.pkl',
+        ann_file=data_root + 'val_dominoes_data.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
@@ -127,7 +127,7 @@ data = dict(
         type=dataset_type,
         modality=dict(use_camera=False, use_lidar=True),
         data_root=data_root,
-        ann_file=data_root + 'val_support_may.pkl',
+        ann_file=data_root + 'train_dominoes_data.pkl',
         pipeline=test_pipeline,
         classes=class_names,
         test_mode=True,
