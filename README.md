@@ -95,7 +95,8 @@ To start training, run [train](tools/train.py) with TR3D [configs](configs/tr3d)
 ```shell
 python tools/train.py configs/tr3d/tr3d_physion_fly_config.py
 ```
->**Note**: In order to control the interval of evaluation, change interval at [this line](mmdet3d/apis/train.py#L312)
+>**Note**: In order to control the interval of evaluation, change interval at [this line](mmdet3d/apis/train.py#L312).
+
 To train without validation:
 ```shell
 python tools/train.py configs/tr3d/tr3d_physion_fly_config.py --no-validate
